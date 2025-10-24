@@ -1,81 +1,113 @@
+from fpdf import FPDF
 import os
 from datetime import datetime
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import cm
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-def find_latest_exam_review_txt():
+def generate_exam_report():
     """
-    Caută în directorul proiectului fișiere de forma exam_review_YYYY-MM-DD_HH-MM.txt
-    și îl întoarce pe cel mai nou. Dacă nu există, returnează None.
+    Generează un raport PDF complet pentru ultima sesiune de quiz (din score_history.txt)
+    Include detalii despre scor, mod, domeniu și grafic de progres (dacă există).
     """
-    files = []
-    for name in os.listdir(BASE_DIR):
-        if name.startswith("exam_review_") and name.endswith(".txt"):
-            full = os.path.join(BASE_DIR, name)
-            files.append((name, full))
 
-    if not files:
-        return None
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    history_path = os.path.join(base_dir, "score_history.txt")
+    chart_path = os.path.join(base_dir, "progress_chart.png")
+    output_path = os.path.join(base_dir, "last_exam_report.pdf")
 
-    # sortăm descrescător după nume (timestampul e în nume)
-    files.sort(reverse=True)
-    return files[0]  # (name, path)
-
-def export_txt_to_pdf(txt_path, pdf_path):
-    """
-    Desenează conținutul .txt într-un PDF simplu (A4, text liniar).
-    """
-    # citește conținutul txt
-    with open(txt_path, "r", encoding="utf-8") as f:
-        lines = [line.rstrip("\n") for line in f]
-
-    c = canvas.Canvas(pdf_path, pagesize=A4)
-    width, height = A4
-
-    # margini
-    x_left = 2 * cm
-    y = height - 2 * cm
-
-    # titlu
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(x_left, y, "Raport EXAM - FEA Quiz")
-    y -= 1 * cm
-
-    c.setFont("Helvetica", 10)
-
-    for line in lines:
-        # dacă nu mai avem loc pe pagină -> pagină nouă
-        if y < 2 * cm:
-            c.showPage()
-            c.setFont("Helvetica", 10)
-            y = height - 2 * cm
-
-        # scriem linia
-        c.drawString(x_left, y, line)
-        y -= 0.5 * cm
-
-    c.save()
-
-
-def main():
-    latest = find_latest_exam_review_txt()
-    if not latest:
-        print("Nu am găsit niciun fișier exam_review_*.txt. Rulează întâi un EXAM.")
+    if not os.path.exists(history_path):
+        print("⚠️ Nu există fișierul score_history.txt — rulează cel puțin o sesiune de quiz EXAM.")
         return
 
-    txt_name, txt_path = latest
-    # exam_review_2025-10-24_23-05.txt -> .pdf
-    pdf_name = txt_name.replace(".txt", ".pdf")
-    pdf_path = os.path.join(BASE_DIR, pdf_name)
+    # Citim ultima sesiune
+    with open(history_path, "r", encoding="utf-8") as f:
+        lines = [l.strip() for l in f if l.strip()]
+    if not lines:
+        print("⚠️ Fișierul e gol — nu există sesiuni salvate.")
+        return
 
-    export_txt_to_pdf(txt_path, pdf_path)
+    last_line = lines[-1]
 
-    print("PDF generat cu succes:")
-    print(pdf_path)
+    # Extragem informațiile principale
+    try:
+        parts = [p.strip() for p in last_line.split("|")]
+        data = {
+            "timestamp": parts[0],
+            "domeniu": parts[1].split("=")[1],
+            "mod": parts[2].split("=")[1],
+            "scor": parts[3].split("=")[1],
+            "procent": parts[4].split("=")[1],
+            "timp_total": parts[5].split("=")[1],
+            "timp_intrebare": parts[6].split("=")[1],
+        }
+    except Exception as e:
+        print(f"Eroare la parsarea ultimei linii: {e}")
+        return
 
+    # ======== Creare PDF ========
+    pdf = FPDF()
+    pdf.add_page()
 
-if __name__ == "__main__":
-    main()
+    # Antet
+    pdf.set_fill_color(0, 0, 0)
+    pdf.rect(0, 0, 210, 30, "F")
+    pdf.set_text_color(0, 255, 255)
+    pdf.set_font("Arial", "B", 20)
+    pdf.cell(0, 15, "FEA Quiz Trainer", ln=True, align="C")
+    pdf.ln(10)
+
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "Raport sesiune EXAM", ln=True, align="C")
+    pdf.ln(8)
+
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(0, 8, f"Data generării: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
+    pdf.cell(0, 8, f"Timp sesiune: {data['timestamp']}", ln=True)
+    pdf.ln(5)
+
+    # Informații despre sesiune
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(0, 8, f"Domeniu: {data['domeniu']}", ln=True)
+    pdf.cell(0, 8, f"Mod: {data['mod']}", ln=True)
+    pdf.cell(0, 8, f"Scor: {data['scor']}", ln=True)
+    pdf.cell(0, 8, f"Procent: {data['procent']}", ln=True)
+    pdf.cell(0, 8, f"Timp total: {data['timp_total']}", ln=True)
+    pdf.cell(0, 8, f"Timp per întrebare: {data['timp_intrebare']}", ln=True)
+    pdf.ln(8)
+
+    # Linie separator
+    pdf.set_draw_color(0, 255, 255)
+    pdf.set_line_width(0.5)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(10)
+
+    # Grafic dacă există
+    if os.path.exists(chart_path):
+        pdf.set_font("Arial", "B", 13)
+        pdf.cell(0, 8, "Grafic progres general:", ln=True)
+        pdf.image(chart_path, x=25, w=160)
+        pdf.ln(10)
+    else:
+        pdf.set_font("Arial", "I", 12)
+        pdf.cell(0, 8, "Graficul nu este disponibil. Generează-l din aplicație înainte de export.", ln=True)
+        pdf.ln(10)
+
+    # Concluzie
+    pdf.set_font("Arial", "I", 11)
+    pct_value = float(data["procent"].replace("%", ""))
+    if pct_value >= 85:
+        msg = "Excelent! 🏆 Cunoștințele tale sunt foarte solide."
+    elif pct_value >= 60:
+        msg = "Bun! Mai ai puțin de lucru pentru perfecționare."
+    else:
+        msg = "Continuă să exersezi — progresul vine cu practica!"
+    pdf.multi_cell(0, 8, f"Analiză automată: {msg}")
+    pdf.ln(5)
+
+    # Footer
+    pdf.set_y(-15)
+    pdf.set_font("Arial", "I", 9)
+    pdf.cell(0, 10, "FEA Quiz Trainer © 2025 | Generat automat", 0, 0, "C")
+
+    # Salvare PDF
+    pdf.output(output_path)
+    print(f"✅ Raport PDF generat cu succes: {output_path}")
