@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
 
 
-# ============ CONFIG ============
+# ================= CONFIG =================
 def save_config(domain, num, mode, time_limit, theme):
     cfg = {"domain": domain, "num_questions": num, "mode": mode, "time_limit": time_limit, "theme": theme}
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
@@ -34,7 +34,7 @@ def load_config():
         return {"domain": "structural", "num_questions": 5, "mode": "train", "time_limit": 15, "theme": "dark"}
 
 
-# ============ SUNETE ============
+# ================= SOUNDS =================
 def sound_correct():
     winsound.Beep(1200, 150)
 
@@ -49,7 +49,7 @@ def sound_finish():
     winsound.Beep(1500, 180)
 
 
-# ============ SPLASH SCREEN ============
+# ================= SPLASH SCREEN =================
 class SplashScreen(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
@@ -66,7 +66,7 @@ class SplashScreen(tk.Toplevel):
         self.after(2000, self.destroy)
 
 
-# ============ QUIZ WINDOW ============
+# ================= QUIZ WINDOW =================
 class QuizWindow(tk.Toplevel):
     def __init__(self, parent, domain, num_questions, mode, time_limit, theme_colors):
         super().__init__(parent)
@@ -198,7 +198,7 @@ class QuizWindow(tk.Toplevel):
         self.feedback.config(text="Felicitări! Completează mai multe teste pentru progres.")
 
 
-# ============ MAIN GUI ============
+# ================= MAIN GUI =================
 class FEAGui(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -208,8 +208,8 @@ class FEAGui(tk.Tk):
         self.config_data = load_config()
         self.theme = self.load_theme()
 
-        # FIX — creăm background după inițializare completă
-        self.after(50, self.make_background)
+        # ✅ FIX pentru eroarea „pyimage1 doesn’t exist”
+        self.bind("<Map>", lambda e: self.make_background())
         self.after(100, self.build_ui)
 
     def load_theme(self):
@@ -219,6 +219,9 @@ class FEAGui(tk.Tk):
             return {"bg": "#111", "text": "white", "accent": "#00ffff"}
 
     def make_background(self):
+        if not self.winfo_exists():
+            return
+
         width, height = 1000, 700
         gradient = Image.new("RGBA", (width, height))
         for y in range(height):
@@ -315,6 +318,7 @@ class FEAGui(tk.Tk):
         messagebox.showinfo("Succes", "PDF generat!")
 
 
+# ================= MAIN APP =================
 if __name__ == "__main__":
     root = tk.Tk()
     root.withdraw()
