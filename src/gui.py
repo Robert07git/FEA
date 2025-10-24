@@ -1,11 +1,11 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import subprocess
 import threading
+import time
 
 from data_loader import load_questions
 from quiz_logic import run_quiz
-from stats import show_dashboard as show_stats  # ✅ FIX: import corectat
+from stats import show_dashboard as show_stats  # ✅ corectat
 from export_pdf import main as export_pdf
 from progress_chart import main as generate_chart
 
@@ -13,8 +13,8 @@ from progress_chart import main as generate_chart
 class QuizWindow(tk.Toplevel):
     def __init__(self, parent, domain, num_questions, mode, time_limit):
         super().__init__(parent)
-        self.title(f"FEA Quiz - Sesiune Quiz")
-        self.geometry("500x600")
+        self.title("FEA Quiz - Sesiune Quiz")
+        self.geometry("550x640")
         self.configure(bg="#111")
 
         self.domain = domain
@@ -31,29 +31,30 @@ class QuizWindow(tk.Toplevel):
         self.score = 0
         self.results = []
         self.remaining_time = self.time_limit
+        self.timer_running = False
 
         self.create_widgets()
         self.show_question()
 
-        if self.mode == "exam" and self.time_limit > 0:
-            self.update_timer()
-
     # --------------------------- UI Setup ---------------------------
 
     def create_widgets(self):
-        style = ttk.Style()
-        style.configure("TButton", font=("Segoe UI", 10), padding=6)
-
         self.lbl_title = tk.Label(self, text=f"Domeniu: {self.domain} | Mod: {self.mode.upper()}",
                                   font=("Segoe UI", 11, "bold"), fg="#00ffff", bg="#111")
         self.lbl_title.pack(pady=8)
 
-        self.lbl_timer = tk.Label(self, text="", font=("Segoe UI", 10), fg="#ffcc00", bg="#111")
-        self.lbl_timer.pack()
+        # Timer vizibil + bară progres
+        self.lbl_timer = tk.Label(self, text="", font=("Segoe UI", 10, "bold"), fg="#ffcc00", bg="#111")
+        self.lbl_timer.pack(pady=3)
 
-        self.lbl_question = tk.Label(self, text="", wraplength=450, justify="left",
+        self.progress_var = tk.DoubleVar(value=100)
+        self.progress_bar = ttk.Progressbar(self, orient="horizontal", length=300,
+                                            variable=self.progress_var, mode="determinate")
+        self.progress_bar.pack(pady=5)
+
+        self.lbl_question = tk.Label(self, text="", wraplength=480, justify="left",
                                      font=("Segoe UI", 10), fg="white", bg="#111")
-        self.lbl_question.pack(pady=15)
+        self.lbl_question.pack(pady=20)
 
         self.var_choice = tk.IntVar(value=-1)
         self.radio_buttons = []
@@ -68,7 +69,7 @@ class QuizWindow(tk.Toplevel):
                                     font=("Segoe UI", 10, "bold"), command=self.submit_answer)
         self.btn_submit.pack(pady=15)
 
-        self.lbl_feedback = tk.Label(self, text="", wraplength=450, justify="left",
+        self.lbl_feedback = tk.Label(self, text="", wraplength=480, justify="left",
                                      font=("Segoe UI", 9, "italic"), fg="#ffb3b3", bg="#111")
         self.lbl_feedback.pack(pady=5)
 
@@ -78,16 +79,34 @@ class QuizWindow(tk.Toplevel):
 
     # --------------------------- Timer ---------------------------
 
-    def update_timer(self):
+    def start_timer(self):
         if self.mode != "exam" or self.time_limit <= 0:
             return
-        if self.remaining_time > 0:
-            self.lbl_timer.config(text=f"Timp rămas: {self.remaining_time}s")
+        self.remaining_time = self.time_limit
+        self.progress_var.set(100)
+        self.timer_running = True
+        self.update_timer_label()
+        threading.Thread(target=self._countdown_thread, daemon=True).start()
+
+    def _countdown_thread(self):
+        while self.remaining_time > 0 and self.timer_running:
+            time.sleep(1)
             self.remaining_time -= 1
-            self.after(1000, self.update_timer)
+            percent = (self.remaining_time / self.time_limit) * 100
+            self.progress_var.set(percent)
+            self.update_timer_label()
+        if self.remaining_time <= 0 and self.timer_running:
+            self.timer_running = False
+            self.after(100, lambda: self.submit_answer(timeout=True))
+
+    def update_timer_label(self):
+        self.lbl_timer.config(text=f"Timp rămas: {self.remaining_time}s")
+        if self.remaining_time <= 5:
+            self.lbl_timer.config(fg="#ff4040")
+        elif self.remaining_time <= 10:
+            self.lbl_timer.config(fg="#ffcc00")
         else:
-            self.lbl_timer.config(text="⏰ Timp expirat!")
-            self.submit_answer(timeout=True)
+            self.lbl_timer.config(fg="#00ff88")
 
     # --------------------------- Logică întrebări ---------------------------
 
@@ -102,9 +121,12 @@ class QuizWindow(tk.Toplevel):
             self.radio_buttons[i].config(text=choice)
         self.var_choice.set(-1)
         self.lbl_feedback.config(text="")
-        self.remaining_time = self.time_limit
+
+        if self.mode == "exam":
+            self.start_timer()
 
     def submit_answer(self, timeout=False):
+        self.timer_running = False
         q = self.questions[self.current_index]
         correct_index = q["correct_index"]
         explanation = q["explanation"]
@@ -136,6 +158,7 @@ class QuizWindow(tk.Toplevel):
     # --------------------------- Rezultat final ---------------------------
 
     def show_result(self):
+        self.timer_running = False
         pct = (self.score / self.num_questions) * 100 if self.num_questions > 0 else 0
         summary = f"=== REZULTAT FINAL ===\nScor: {self.score}/{self.num_questions}\nProcent: {pct:.1f}%\nMod: {self.mode.upper()}\n"
 
@@ -155,6 +178,7 @@ class QuizWindow(tk.Toplevel):
             rb.pack_forget()
         self.lbl_feedback.pack_forget()
         self.lbl_timer.pack_forget()
+        self.progress_bar.pack_forget()
         self.btn_submit.config(state="disabled")
 
 
