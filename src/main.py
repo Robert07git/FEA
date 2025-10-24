@@ -31,10 +31,6 @@ def alege_domeniu():
 
 
 def alege_numar_intrebari(max_intrebari, domeniu_curent):
-    """
-    Cere utilizatorului câte întrebări vrea în test, dar nu îl lasă
-    să ceară mai multe decât există în domeniul ales.
-    """
     while True:
         try:
             num = int(input(
@@ -49,10 +45,22 @@ def alege_numar_intrebari(max_intrebari, domeniu_curent):
             print("Introdu un număr valid (ex: 5, 10).")
 
 
+def alege_modul():
+    print("Alege modul de testare:")
+    print("  1 - TRAIN  (fără limită de timp, feedback imediat și explicații după fiecare întrebare)")
+    print("  2 - EXAM   (limită de timp pe întrebare, feedback abia la final)")
+    alegere = input("Mod (1-2): ").strip()
+    if alegere == "2":
+        print("\nMod selectat: EXAM\n")
+        return "exam"
+    else:
+        print("\nMod selectat: TRAIN\n")
+        return "train"
+
+
 def alege_timp_limita():
     """
-    Întreabă utilizatorul câte secunde are voie pe întrebare.
-    Punem și un fallback rezonabil dacă introduce prostii.
+    Întreabă utilizatorul câte secunde are voie pe întrebare (pentru EXAM).
     """
     while True:
         try:
@@ -61,24 +69,25 @@ def alege_timp_limita():
                 print("Sub 3 secunde e prea agresiv 🙂. Hai să punem măcar 3s.")
                 continue
             if t > 120:
-                print("Peste 120s e prea lent. Dacă vrei studiu fără timp, putem face un mod separat. Alege <=120.")
+                print("Peste 120s e prea lent. Dacă vrei studiu fără timp, folosește modul TRAIN.")
                 continue
             return t
         except ValueError:
             print("Introdu un număr întreg. Exemplu valid: 15")
 
 
-def salveaza_scor(domeniu, score, asked, pct, durata_sec, timp_per_intrebare):
+def salveaza_scor(domeniu, mode, score, asked, pct, durata_sec, timp_per_intrebare):
     """
-    Scrie scorul într-un fișier local score_history.txt, împreună cu timpul.
+    Scrie scorul într-un fișier local score_history.txt, împreună cu timpul și modul.
     """
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     history_path = os.path.join(base_dir, "score_history.txt")
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     line = (
-        f"{timestamp} | domeniu={domeniu} | scor={score}/{asked} | procent={pct:.1f}% | "
-        f"timp_total={durata_sec:.1f}s | timp_intrebare={timp_per_intrebare}s\n"
+        f"{timestamp} | domeniu={domeniu} | mod={mode} | "
+        f"scor={score}/{asked} | procent={pct:.1f}% | "
+        f"timp_total={durata_sec:.1f}s | timp_intrebare={timp_per_intrebare}\n"
     )
 
     try:
@@ -88,14 +97,40 @@ def salveaza_scor(domeniu, score, asked, pct, durata_sec, timp_per_intrebare):
         print(f"[Avertisment] Nu am putut salva scorul în score_history.txt: {e}")
 
 
+def afiseaza_revizuire_exam(results):
+    """
+    După EXAM: afișăm doar întrebările greșite / fără răspuns,
+    cu răspunsul corect și explicația, ca să poți învăța.
+    """
+    gresite = [r for r in results if not r["correct"]]
+
+    print("\n=== REVIZUIRE ÎNTREBĂRI GREȘITE ===")
+    if not gresite:
+        print("Ai răspuns corect la toate întrebările. GG 🎯")
+        return
+
+    for r in gresite:
+        idx = r["idx"]
+        qtext = r["question"]
+        choices = r["choices"]
+        correct_idx = r["correct_index"]
+        expl = r["explanation"]
+        domeniu = r["domain"]
+
+        print("------------------------------------------------------------")
+        print(f"Q{idx} ({domeniu}) -> {qtext}")
+        print(f"Răspuns corect: {correct_idx+1}. {choices[correct_idx]}")
+        print("Explicație:", expl)
+        print()
+
+
 def main():
-    # 1. Alegi domeniul
+    # 1. Alegem domeniul
     domeniu_selectat = alege_domeniu()
 
-    # 2. Încărcăm întrebările pentru acel domeniu
+    # 2. Încărcăm întrebările din domeniul ales
     questions = load_questions(domain=domeniu_selectat)
 
-    # Dacă domeniul selectat e gol (nu ar trebui, dar safety):
     max_intrebari = len(questions)
     if max_intrebari == 0:
         print("Nu există întrebări pentru domeniul ales. Se folosește automat MIX.")
@@ -103,24 +138,32 @@ def main():
         questions = load_questions(domain=domeniu_selectat)
         max_intrebari = len(questions)
 
-    # 3. Alegi câte întrebări vrei
+    # 3. Alegem câte întrebări vrei
     num_q = alege_numar_intrebari(max_intrebari, domeniu_selectat)
 
-    # 4. Alegi timpul per întrebare
-    time_limit_sec = alege_timp_limita()
-    print(f"\nOK. Vei avea {time_limit_sec} secunde / întrebare.\n")
+    # 4. Alegem modul (TRAIN / EXAM)
+    mode = alege_modul()
 
-    # 5. Rulăm quiz-ul și măsurăm durata totală a sesiunii
+    # 5. Dacă e EXAM, alegem timpul per întrebare
+    if mode == "exam":
+        time_limit_sec = alege_timp_limita()
+        print(f"\nOK. Vei avea {time_limit_sec} secunde / întrebare.\n")
+    else:
+        time_limit_sec = None
+        print("Mod TRAIN: fără limită de timp per întrebare.\n")
+
+    # 6. Rulăm quiz-ul și măsurăm durata totală
     start_time = time.time()
-    score, asked = run_quiz(
+    score, asked, results = run_quiz(
         questions,
         num_questions=num_q,
+        mode=mode,
         time_limit_sec=time_limit_sec
     )
     end_time = time.time()
     durata_sec = end_time - start_time
 
-    # 6. Calculăm scorul și afișăm rezultatul final
+    # 7. Scor final
     print("=== REZULTAT FINAL ===")
     print(f"Scor: {score}/{asked}")
     pct = (score / asked) * 100 if asked > 0 else 0
@@ -128,7 +171,6 @@ def main():
     print(f"Timp total folosit: {durata_sec:.1f} secunde (~{durata_sec/60:.1f} minute)")
     print()
 
-    # Feedback calitativ
     if pct >= 80:
         print("Bravo, ești pe drumul bun pentru un interviu CAE junior 👌")
     elif pct >= 50:
@@ -136,14 +178,19 @@ def main():
     else:
         print("Nu-i panică. Reia teoria de bază. Asta se învață 💪")
 
-    # 7. Salvăm scorul + timpul în istoric
+    # 8. Dacă ai fost în modul EXAM, îți arătăm greșelile după scor
+    if mode == "exam":
+        afiseaza_revizuire_exam(results)
+
+    # 9. Salvăm scorul + timpul în istoricul local
     salveaza_scor(
         domeniu_selectat,
+        mode,
         score,
         asked,
         pct,
         durata_sec,
-        time_limit_sec
+        f"{time_limit_sec}s" if time_limit_sec is not None else "-"
     )
 
     print("\nRezultatul a fost salvat în score_history.txt ✅")
