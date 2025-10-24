@@ -4,13 +4,13 @@ import threading
 import os
 import sys
 
-# asigură-te că putem importa din src
+# Adaugă automat folderul src în path, dacă rulezi din afara lui
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from src.quiz_core import load_questions
-from src.stats import show_stats
-from src.progress_chart import main as generate_chart
-from src.export_pdf import main as export_pdf
+from quiz_core import load_questions
+from stats import show_stats
+from progress_chart import main as generate_chart
+from export_pdf import main as export_pdf
 
 
 class QuizWindow(tk.Toplevel):
@@ -118,13 +118,13 @@ class QuizWindow(tk.Toplevel):
         else:
             feedback = f"❌ Greșit! Răspuns corect: {correct}. {q['choices'][correct-1]}"
 
-        # afișează explicația doar în TRAIN
+        # Afișează explicația doar în TRAIN mode
         if self.mode == "TRAIN":
             self.label_explanation.config(text=f"Explicație: {q['explanation']}")
 
         self.label_result.config(text=feedback)
 
-        # Trecem la următoarea întrebare
+        # Trecem automat la următoarea întrebare
         self.current_q += 1
         self.after(2000 if self.mode == "TRAIN" else 1000, self.display_question)
 
