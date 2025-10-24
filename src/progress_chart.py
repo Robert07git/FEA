@@ -7,15 +7,9 @@ HISTORY_PATH = os.path.join(BASE_DIR, "score_history.txt")
 OUTPUT_IMG = os.path.join(BASE_DIR, "progress_chart.png")
 
 def parse_history_line(line):
-    # Refolosim logica asemănătoare cu stats.py
     try:
         parts = [p.strip() for p in line.strip().split("|")]
 
-        # [0] timestamp
-        # [1] domeniu=...
-        # [2] mod=...
-        # [3] scor=7/10
-        # [4] procent=70.0%
         timestamp = parts[0]
         domeniu = parts[1].split("=", 1)[1]
         mode = parts[2].split("=", 1)[1]
@@ -56,34 +50,29 @@ def load_scores():
 def main():
     entries = load_scores()
     if not entries:
-        print("Nu există scoruri în score_history.txt încă.")
+        print("Nu exista scoruri in score_history.txt inca.")
         return
-
-    # ordonăm după timestamp așa cum apare în fișier (deja e în ordine cronologică
-    # pentru că noi tot adăugăm la final)
-    # Dacă vrem să fim siguri: putem păstra ordinea citită.
 
     pct_values = [e["pct"] for e in entries]
     labels_x = list(range(1, len(pct_values) + 1))
-
     avg_all = mean(pct_values)
 
     plt.figure()
     plt.plot(labels_x, pct_values, marker="o")
-    plt.axhline(avg_all, linestyle="--", label=f"Media totală ({avg_all:.1f}%)")
+    plt.axhline(avg_all, linestyle="--", label=f"Media totala ({avg_all:.1f}%)")
 
     plt.xlabel("Sesiunea (#)")
     plt.ylabel("Scor (%)")
-    plt.title("Evoluția scorului în timp (toate domeniile / toate modurile)")
+    plt.title("Evolutia scorului in timp (toate domeniile / toate modurile)")
     plt.legend()
 
     plt.tight_layout()
     plt.savefig(OUTPUT_IMG)
     plt.close()
 
-    print("Grafic generat și salvat ca:")
+    print("Grafic generat si salvat ca:")
     print(OUTPUT_IMG)
-    print("Poți deschide imaginea progress_chart.png ca să vezi trendul tău.")
+    print("Poti deschide progress_chart.png ca sa vezi trendul tau.")
 
 if __name__ == "__main__":
     main()
