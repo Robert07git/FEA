@@ -17,23 +17,23 @@
     "choices": [
       "Elementul solid are grosime mică și modelează doar suprafața",
       "Elementul shell nu are proprietăți de material",
-      "Elementul shell descrie plăci/subansamble subțiri cu grosime definită, solidul modelează volum 3D complet",
+      "Elementul shell descrie plăci sau tablă subțire cu grosime definită, solidul modelează volum 3D complet",
       "Elementul solid nu poate suporta compresiune"
     ],
     "correct_index": 2,
-    "explanation": "Shell se folosește pentru piese subțiri (tablă, caroserie), are grosime definită separat. Solidul reprezintă volum complet al materialului."
+    "explanation": "Shell se folosește pentru piese subțiri (tablă, caroserie), are grosime definită separat. Solidul reprezintă volumul complet al materialului."
   },
   {
     "domain": "structural",
     "question": "De ce este importantă calitatea mesh-ului într-o analiză structurală?",
     "choices": [
-      "Pentru că schimbă culoarea modelului în post-procesare",
+      "Pentru a schimba culoarea modelului în post-procesare",
       "Pentru a reduce greutatea fizică a piesei",
       "Pentru stabilitate numerică și rezultate (tensiuni, deformații) mai corecte",
       "Nu are importanță atâta timp cât solverul rulează până la capăt"
     ],
     "correct_index": 2,
-    "explanation": "Elementele foarte distorsionate (aspect ratio mare, unghiuri proaste) pot produce tensiuni artificiale și pot destabiliza soluția."
+    "explanation": "Elementele distorsionate dau tensiuni artificiale și pot destabiliza soluția. Mesh-ul bun = rezultate mai credibile."
   },
   {
     "domain": "structural",
@@ -45,59 +45,59 @@
       "Permite doar rotația liberă fără translații"
     ],
     "correct_index": 1,
-    "explanation": "O prindere fixă ideală înseamnă DOF blocate: nodurile nu se pot deplasa și nu se pot roti. Este o condiție foarte rigidă."
+    "explanation": "O prindere fixă ideală înseamnă DOF blocate: nodurile nu se pot deplasa și nu se pot roti."
   },
   {
     "domain": "structural",
-    "question": "Care dintre următoarele descrie corect tensiunea Von Mises?",
+    "question": "Ce descrie tensiunea Von Mises?",
     "choices": [
-      "Este tensiunea normală maximă pe direcția X",
-      "Este tensiunea medie pe toate direcțiile",
-      "Este un criteriu echivalent folosit pentru a evalua cedarea plastică în materiale ductile",
-      "Este doar presiune hidrostatică"
+      "Tensiunea normală maximă pe direcția X",
+      "Tensiunea medie pe toate direcțiile",
+      "Un criteriu echivalent folosit pentru a evalua cedarea plastică în materiale ductile",
+      "Doar presiunea hidrostatică"
     ],
     "correct_index": 2,
-    "explanation": "Tensiunea Von Mises combină componentele tensiunii într-o valoare scalară care se compară cu limita de curgere pentru materiale ductile (oțel, aluminiu etc.)."
+    "explanation": "Von Mises combină starea de tensiune într-un scalar. Dacă depășește limita de curgere, materialul ductil intră în plastic."
   },
   {
     "domain": "structural",
     "question": "Ce diferență majoră există între o analiză liniară și una neliniară structurală?",
     "choices": [
       "Analiza liniară rulează doar pe GPU, neliniara doar pe CPU",
-      "Analiza neliniară poate include mari deformații, contact și comportament plastic",
+      "Analiza neliniară poate include mari deformații, contact și plasticitate",
       "Analiza liniară nu are nevoie de mesh",
       "Analiza neliniară nu poate avea încărcări mecanice"
     ],
     "correct_index": 1,
-    "explanation": "Analiza neliniară ia în calcul efecte cum ar fi: mari deformații geometrice, material plastic, contact între piese. Analiza liniară presupune răspuns elastic mic și relație forță-deplasare proporțională."
+    "explanation": "Analiza neliniară ia în calcul efecte cum ar fi: mari deformații geometrice, material plastic, contact între piese."
   },
   {
     "domain": "structural",
-    "question": "Ce este o 'constrângere de simetrie' într-o analiză structurală?",
+    "question": "Ce este o constrângere de simetrie într-o analiză structurală?",
     "choices": [
       "Permite doar rotația liberă a nodurilor",
-      "Forțează nodurile să aibă deplasare zero pe o direcție normală la un plan",
+      "Forțează nodurile să aibă deplasare zero pe direcția normală la un plan",
       "Aplică o sarcină uniformă pe zona respectivă",
-      "Umple automat mesh-ul pe cealaltă jumătate a modelului"
+      "Generează automat mesh și pe partea cealaltă"
     ],
     "correct_index": 1,
-    "explanation": "Simetria spune solverului că pe acel plan deplasarea normală e zero. Asta îți permite să modelezi doar jumătate/ sfertul piesei și să economisești timp de calcul."
+    "explanation": "Simetria spune solverului că deplasarea normală la acel plan e zero. Asta îți permite să modelezi doar jumătate/sfert din piesă."
   },
   {
     "domain": "structural",
     "question": "Ce reprezintă 'strain' (deformația unitară) într-o analiză structurală?",
     "choices": [
       "Modificarea temperaturii materialului",
-      "Raportul dintre deplasarea relativă și lungimea inițială",
+      "Raportul dintre alungire și lungimea inițială",
       "Greutatea totală a componentului",
       "Rotația elementului în jurul axei Z"
     ],
     "correct_index": 1,
-    "explanation": "Strain = (ΔL / L0). Măsoară cât de mult s-a întins/comprimat un material relativ la lungimea inițială. E fără unitate."
+    "explanation": "Strain = ΔL / L0. Măsoară cât de mult s-a întins/comprimat un material relativ la lungimea inițială. E fără unitate."
   },
   {
     "domain": "structural",
-    "question": "De ce facem 'mesh refinement' (rafina mesh-ul) într-o zonă cu concentrator de tensiune (ex: gaură, colț ascuțit)?",
+    "question": "De ce facem 'mesh refinement' într-o zonă cu concentrator de tensiune (ex: gaură, colț ascuțit)?",
     "choices": [
       "Ca să reducem numărul total de elemente",
       "Ca să obținem tensiuni locale mai detaliate și mai corecte",
@@ -105,18 +105,550 @@
       "Ca să blocăm deplasările în acea zonă"
     ],
     "correct_index": 1,
-    "explanation": "În zonele unde tensiunile cresc brusc (găuri, colțuri), e nevoie de elemente mai mici ca solverul să poată capta corect variația tensiunii."
+    "explanation": "În zonele unde tensiunile cresc brusc e nevoie de elemente mai mici ca solverul să capteze corect gradientul de tensiune."
   },
   {
     "domain": "structural",
     "question": "Ce înseamnă 'convergența' într-o analiză structurală neliniară iterativă?",
     "choices": [
-      "Solverul a terminat de rulat fără erori, indiferent de rezultate",
+      "Solverul a terminat de rulat fără erori de sistem",
       "Forțele interne din model se echilibrează cu forțele aplicate în limita unei toleranțe",
       "Mesh-ul a fost generat fără elemente distorsionate",
       "Materialul este pur elastic"
     ],
     "correct_index": 1,
-    "explanation": "Convergență = diferența dintre reacțiile interne și încărcarea aplicată a devenit suficient de mică (sub toleranță). Asta înseamnă că solverul a găsit un echilibru mecanic stabil pentru pasul curent."
+    "explanation": "Convergență = diferența dintre reacțiile interne și încărcarea aplicată a devenit suficient de mică. Asta înseamnă echilibru mecanic stabil."
+  },
+
+  {
+    "domain": "crash",
+    "question": "Ce reprezintă o curbă forță–deplasare într-un test de crash local (ex: impact frontal într-o zonă de lonjeroane)?",
+    "choices": [
+      "Rezistența structurală și modul de absorbție a energiei",
+      "Viteza solverului",
+      "Doar rigiditatea elastică, fără plasticitate",
+      "Doar masa vehiculului"
+    ],
+    "correct_index": 0,
+    "explanation": "Curba forță–deplasare arată cum structura absoarbe energia prin deformare controlată. Zona sub curbă = energia disipată."
+  },
+  {
+    "domain": "crash",
+    "question": "Ce tip de solver se folosește cel mai des în analizele de crash?",
+    "choices": [
+      "Solver implicit (static)",
+      "Solver explicit (dinamic neliniar rapid)",
+      "Solver termic cu transfer de căldură",
+      "Solver acustic pur"
+    ],
+    "correct_index": 1,
+    "explanation": "Crash-ul este un fenomen foarte rapid și neliniar. Solverul explicit integrează timpul pas cu pas la scară de micro-/milisecunde."
+  },
+  {
+    "domain": "crash",
+    "question": "De ce se folosesc materiale cu comportament plastic controlat în zonele de absorbție la impact?",
+    "choices": [
+      "Pentru a fi mai ușor de meshat",
+      "Pentru a disipa energie prin deformare permanentă, fără rupere bruscă",
+      "Pentru a rămâne complet elastice",
+      "Pentru a elimina nevoia de contact"
+    ],
+    "correct_index": 1,
+    "explanation": "Zonele de crash sunt proiectate să se deformeze plastic, absorbând energie și protejând habitaclul."
+  },
+  {
+    "domain": "crash",
+    "question": "Ce reprezintă 'time step' într-un solver explicit de crash?",
+    "choices": [
+      "Numărul de cadre din animația rezultatelor",
+      "Timpul necesar pentru a salva fișierul de output",
+      "Intervalul de timp pentru fiecare integrare numerică, limitat de dimensiunea minimă a elementelor",
+      "Durata totală a simulării"
+    ],
+    "correct_index": 2,
+    "explanation": "Pasul de timp trebuie să fie foarte mic pentru stabilitate numerică. Elemente mai mici → pas de timp și mai mic."
+  },
+  {
+    "domain": "crash",
+    "question": "Ce înseamnă 'energy balance' într-o simulare de impact?",
+    "choices": [
+      "Verificarea ca energia totală (cinetică + internă + de contact) se conservă",
+      "Numărul de elemente deformate",
+      "Doar energia cinetică a vehiculului",
+      "Temperatura materialului"
+    ],
+    "correct_index": 0,
+    "explanation": "Energy balance verifică dacă energia se conservă realist. Devierea mare poate indica instabilități numerice."
+  },
+  {
+    "domain": "crash",
+    "question": "De ce este critică definirea contactelor între componente într-o analiză de crash?",
+    "choices": [
+      "Pentru a evita interpenetrarea pieselor și a transmite forțe realist",
+      "Pentru a reduce numărul de noduri din model",
+      "Pentru a micșora timpul de calcul prin eliminarea coliziunilor",
+      "Pentru a bloca complet mișcarea componentelor"
+    ],
+    "correct_index": 0,
+    "explanation": "Contactele controlează interacțiunea pieselor în coliziune. Contact prost = penetrații nerealiste sau lipsă transfer de încărcare."
+  },
+  {
+    "domain": "crash",
+    "question": "Ce indică o creștere bruscă a energiei interne într-o simulare de impact?",
+    "choices": [
+      "Modelul a devenit instabil numeric sau are elemente distorsionate",
+      "Simularea a fost validată",
+      "Contactele sunt corecte",
+      "Temperatura a crescut prea mult"
+    ],
+    "correct_index": 0,
+    "explanation": "O creștere bruscă a energiei interne poate însemna elemente 'rupte' numeric sau timestep prea mare."
+  },
+  {
+    "domain": "crash",
+    "question": "De ce folosim manechine (dummies) virtuale în simulări de crash?",
+    "choices": [
+      "Pentru a calcula forțele și accelerațiile aplicate corpului uman",
+      "Pentru a înlocui vehiculul în totalitate",
+      "Pentru a absorbi energia cinetică",
+      "Pentru a măsura doar deformarea caroseriei"
+    ],
+    "correct_index": 0,
+    "explanation": "Manechinele virtuale au senzori numerici. Ele ne spun ce accelerații și încărcări vede capul, toracele, picioarele etc."
+  },
+  {
+    "domain": "crash",
+    "question": "Ce parametru este urmărit frecvent pentru siguranța pasagerilor în crash frontal?",
+    "choices": [
+      "Temperatura habitaclului",
+      "Accelerațiile și forțele asupra capului și toracelui",
+      "Deplasarea pedalei de frână",
+      "Energia absorbită de bara spate"
+    ],
+    "correct_index": 1,
+    "explanation": "Accelerațiile maxime și încărcările aplicate zonelor critice ale corpului sunt indicatori cheie pentru risc de rănire."
+  },
+  {
+    "domain": "crash",
+    "question": "Care este obiectivul principal al unei simulări de crash structural?",
+    "choices": [
+      "Să minimizeze masa modelului CAD",
+      "Să prezică deformările, absorbția de energie și protecția compartimentului pasagerilor",
+      "Să calculeze distribuția temperaturii în timp",
+      "Să elimine contactele dintre piese"
+    ],
+    "correct_index": 1,
+    "explanation": "Scopul este să vezi dacă structura absoarbe energia controlat și menține zona pasagerilor cât mai puțin deformată."
+  },
+  {
+    "domain": "crash",
+    "question": "De ce sunt importante centurile și airbagurile în simulările de crash ocupant?",
+    "choices": [
+      "Ca să rigidizeze caroseria",
+      "Ca să reducă deplasarea ocupantului și să limiteze vârful de accelerație asupra corpului",
+      "Ca să scadă masa totală a vehiculului",
+      "Ca să reducă timpul de calcul"
+    ],
+    "correct_index": 1,
+    "explanation": "Sistemele de reținere controlează mișcarea ocupantului și reduc încărcările maxime pe cap / torace."
+  },
+
+  {
+    "domain": "moldflow",
+    "question": "Ce este faza de umplere ('filling') în analiza Moldflow?",
+    "choices": [
+      "Răcirea piesei după injecție",
+      "Comprimarea materialului solidificat",
+      "Faza în care topitura polimerului intră în cavitate și o umple",
+      "Tăierea canalelor de alimentare"
+    ],
+    "correct_index": 2,
+    "explanation": "Filling = materialul topit (plastic) curge prin poartă și umple cavitatea matriței."
+  },
+  {
+    "domain": "moldflow",
+    "question": "Ce este faza de 'packing' / 'holding'?",
+    "choices": [
+      "Îndepărtarea piesei din matriță",
+      "Menținerea unei presiuni pentru a compensa contracția volumică în timpul solidificării",
+      "Răcirea accelerată prin jet de aer",
+      "Monitorizarea culorii materialului"
+    ],
+    "correct_index": 1,
+    "explanation": "Packing înseamnă că injectorul încă mai împinge material pentru a compensa micșorarea volumului când plasticul începe să se solidifice."
+  },
+  {
+    "domain": "moldflow",
+    "question": "Ce sunt 'liniile de sudură' (weld lines) într-o piesă injectată?",
+    "choices": [
+      "Zone unde se unesc două fronturi de flux de material topit",
+      "Defecte de culoare",
+      "Fisuri apărute doar din răcire neuniformă",
+      "Zone care sunt intenționat ranforsate cu metal"
+    ],
+    "correct_index": 0,
+    "explanation": "Weld line apare când două fluxuri de polimer se întâlnesc și nu se amestecă perfect. Poate fi zonă mai slabă mecanic / estetic."
+  },
+  {
+    "domain": "moldflow",
+    "question": "Ce este contracția (shrinkage) la o piesă de plastic injectat?",
+    "choices": [
+      "Creșterea volumului după răcire",
+      "Scăderea volumului când plasticul se răcește și se solidifică",
+      "Schimbarea culorii în timp",
+      "Răcirea doar într-o singură zonă"
+    ],
+    "correct_index": 1,
+    "explanation": "Plasticul topit ocupă mai mult volum. Pe măsură ce se răcește, se contractă → apar abateri dimensionale și potențial zone de 'sink'."
+  },
+  {
+    "domain": "moldflow",
+    "question": "Ce înseamnă 'warpage' într-o simulare Moldflow?",
+    "choices": [
+      "Fisurarea imediată la demulare",
+      "Deplasare permanentă / deformare a piesei după răcire",
+      "Topirea completă a matriței",
+      "Scăderea temperaturii sub 0°C"
+    ],
+    "correct_index": 1,
+    "explanation": "Warpage = piesa se curbează sau se strâmbă după ce e scoasă din matriță, din cauza tensiunilor interne și a răcirii neuniforme."
+  },
+  {
+    "domain": "moldflow",
+    "question": "De ce poziția porții de injecție (gate) este critică?",
+    "choices": [
+      "Determină culoarea finală",
+      "Controlează modul de umplere, direcția fluxului și apariția liniilor de sudură",
+      "Nu contează, software-ul o ignoră",
+      "Are impact doar la piese metalice"
+    ],
+    "correct_index": 1,
+    "explanation": "Poziția porții influențează traseul fluxului de polimer, presiunea necesară, sudurile interne și calitatea vizuală."
+  },
+  {
+    "domain": "moldflow",
+    "question": "Ce rol are analiza de răcire (cooling analysis) în Moldflow?",
+    "choices": [
+      "Să simuleze degradarea chimică a polimerului",
+      "Să estimeze modul în care canalele de răcire din matriță influențează timpii de solidificare și deformarea finală",
+      "Să optimizeze culoarea pigmentului",
+      "Să prevadă delaminarea stratului vopsit"
+    ],
+    "correct_index": 1,
+    "explanation": "Răcirea neuniformă = contracție neuniformă = warpage. Canalele de răcire sunt critice pentru calitatea finală și ciclul de injecție."
+  },
+  {
+    "domain": "moldflow",
+    "question": "Ce este 'shear rate' (rata de forfecare) în contextul curgerii polimerului topit?",
+    "choices": [
+      "Rata la care plasticul își schimbă culoarea",
+      "Viteza de rotație a matriței în jurul axei Z",
+      "Viteza relativă dintre straturile de material care curg, care influențează încălzirea și vâscozitatea",
+      "Numărul de canale de injecție"
+    ],
+    "correct_index": 2,
+    "explanation": "Shear rate mare → materialul poate deveni mai fluid local, dar și mai încălzit. Prea mare = degradare sau linii vizibile."
+  },
+  {
+    "domain": "moldflow",
+    "question": "Ce este 'sink mark' la o piesă injectată?",
+    "choices": [
+      "Un canal tehnologic în plus pentru ejector",
+      "O zonă scufundată / adâncită la suprafață, cauzată de contracția locală a materialului gros",
+      "O gaură intenționată pentru șurub",
+      "O sudură structurală"
+    ],
+    "correct_index": 1,
+    "explanation": "Zonele groase se răcesc mai lent și se contractă mai mult → apare un fel de 'adâncitură' vizibilă la exterior."
+  },
+  {
+    "domain": "moldflow",
+    "question": "De ce unele analize Moldflow includ orientarea fibrelor (fibre orientation)?",
+    "choices": [
+      "Doar pentru culoare",
+      "Pentru estetica suprafeței după vopsire",
+      "Pentru a prezice anizotropia mecanică (rigiditate diferită pe direcții) la materiale ranforsate cu fibră",
+      "Nu se folosește în industrie"
+    ],
+    "correct_index": 2,
+    "explanation": "La piese din plastic ranforsat cu fibră de sticlă / carbon, orientarea fibrelor schimbă complet rigiditatea și warpage-ul final."
+  },
+  {
+    "domain": "moldflow",
+    "question": "Care este scopul fazei de 'cooling time' în ciclul de injecție?",
+    "choices": [
+      "Creșterea presiunii de injecție",
+      "Stabilizarea dimensională a piesei până când devine suficient de rigidă pentru a fi extrasă din matriță",
+      "Schimbarea materialului în timpul ciclului",
+      "Colorarea piesei"
+    ],
+    "correct_index": 1,
+    "explanation": "Dacă scoți piesa prea devreme, ea se poate deforma. Dacă o lași prea mult, crești timpul de ciclu și costul."
+  },
+
+  {
+    "domain": "cfd",
+    "question": "Ce reprezintă numărul Reynolds într-o analiză CFD?",
+    "choices": [
+      "Raportul dintre forțele inerțiale și cele vâscoase din curgere",
+      "Temperatura medie a fluidului",
+      "Cantitatea de aer rămasă într-un rezervor",
+      "Nivelul de zgomot acustic"
+    ],
+    "correct_index": 0,
+    "explanation": "Reynolds mic → curgere laminară. Reynolds mare → curgere turbulentă. Este esențial pentru tipul de modelare a fluxului."
+  },
+  {
+    "domain": "cfd",
+    "question": "Ce este stratul limită (boundary layer)?",
+    "choices": [
+      "Un strat de izolație termică extern",
+      "Zona de lângă perete unde viteza fluidului se schimbă foarte rapid de la 0 (la perete) la viteza curentului liber",
+      "O zonă fără frecare",
+      "O regiune unde fluidul este solid"
+    ],
+    "correct_index": 1,
+    "explanation": "Lângă pereți viteza trebuie să ajungă la zero (no-slip). Acea tranziție rapidă se numește strat limită și influențează frecarea și drag-ul."
+  },
+  {
+    "domain": "cfd",
+    "question": "Ce înseamnă condiție de frontieră 'inlet velocity' într-o simulare CFD?",
+    "choices": [
+      "Fixează concentrația de poluant",
+      "Definește viteza cu care intră fluidul în domeniu",
+      "Blochează complet curgerea",
+      "Setează temperatura constantă pe pereți"
+    ],
+    "correct_index": 1,
+    "explanation": "La intrare poți impune un profil de viteză. Solverul calculează apoi distribuția presiunii și a debitului în tot domeniul."
+  },
+  {
+    "domain": "cfd",
+    "question": "Ce reprezintă ecuația de continuitate în CFD pentru un fluid incomprimabil?",
+    "choices": [
+      "Presiunea este zero peste tot",
+      "Suma forțelor este constantă",
+      "Divergența vitezei este zero (masa se conservă, fără acumulare locală)",
+      "Temperatura e uniformă în tot domeniul"
+    ],
+    "correct_index": 2,
+    "explanation": "Pentru fluid incomprimabil, ceea ce intră într-un volum de control trebuie să și iasă. Asta e condiția de continuitate."
+  },
+  {
+    "domain": "cfd",
+    "question": "De ce este importantă calitatea mesh-ului în CFD?",
+    "choices": [
+      "Schimbă culoarea rezultatelor",
+      "Afectează stabilitatea numerică și acuratețea gradientelor de presiune și viteză",
+      "Determină materialul solid al pereților",
+      "Nu contează atâta timp cât curgerea este turbulentă"
+    ],
+    "correct_index": 1,
+    "explanation": "Elemente foarte alungite sau pereți prost rezoluționați pot duce la rezultate greșite sau divergență."
+  },
+  {
+    "domain": "cfd",
+    "question": "Ce este coeficientul de tracțiune (drag coefficient)?",
+    "choices": [
+      "Raportul dintre forțele de frecare și cele de presiune care se opun mișcării unui corp în fluid",
+      "Greutatea totală a vehiculului",
+      "Forța dinamică pe direcția verticală",
+      "Viteza sunetului în aer"
+    ],
+    "correct_index": 0,
+    "explanation": "Coeficientul de drag îți spune cât de 'aerodinamic' este un obiect. Cu cât e mai mic, cu atât rezistența la înaintare e mai mică."
+  },
+  {
+    "domain": "cfd",
+    "question": "Ce sunt reziduurile (residuals) într-o simulare CFD staționară?",
+    "choices": [
+      "Cantitatea de material rămasă după printare 3D",
+      "Diferența dintre soluția curentă și soluția din pasul anterior (eroarea numerică care ar trebui să scadă)",
+      "Valoarea presiunii absolute la intrare",
+      "Nivelul de zgomot acustic măsurat"
+    ],
+    "correct_index": 1,
+    "explanation": "Pe măsură ce solverul iterează, reziduurile ar trebui să scadă. Reziduu mic = soluție stabilizată (convergentă)."
+  },
+  {
+    "domain": "cfd",
+    "question": "La ce se referă noțiunea de 'y+' în modelarea stratului limită turbulent?",
+    "choices": [
+      "Nivelul de ionizare a aerului",
+      "Poziția relativă a primului nod de mesh față de perete, raportat la grosimea stratului limită vâscos",
+      "Coeficientul de dilatare termică",
+      "Debitul total masic"
+    ],
+    "correct_index": 1,
+    "explanation": "y+ spune dacă mesh-ul de lângă perete e suficient de fin pentru modelul de turbulență ales. Foarte important la aerodinamică auto."
+  },
+  {
+    "domain": "cfd",
+    "question": "Ce reprezintă presiunea statică într-un flux de aer?",
+    "choices": [
+      "Presiunea datorată doar mișcării relative a fluidului",
+      "Presiunea măsurată dacă ai merge în 'viteză zero' cu fluidul (fără componenta dinamică)",
+      "Presiunea rezultată exclusiv din temperatură",
+      "Presiunea sonoră"
+    ],
+    "correct_index": 1,
+    "explanation": "Presiunea statică e presiunea locală a fluidului independent de viteza curgerii. Presiunea totală = statică + dinamică."
+  },
+  {
+    "domain": "cfd",
+    "question": "Ce urmărești când analizezi o cădere de presiune (pressure drop) într-un canal?",
+    "choices": [
+      "Să vezi dacă temperatura crește peste 1000°C",
+      "Să evaluezi pierderile de sarcină ale sistemului (cât de greu e pentru fluid să curgă)",
+      "Să vezi dacă piesa vibrează la o frecvență critică",
+      "Să verifici dacă pereții sunt suficient de groși"
+    ],
+    "correct_index": 1,
+    "explanation": "Căderea de presiune îți spune cât 'costă' din punct de vedere energetic să împingi fluidul prin acea geometrie."
+  },
+  {
+    "domain": "cfd",
+    "question": "De ce aplicăm uneori condiții de ieșire de tip 'outlet pressure = 0 gauge'?",
+    "choices": [
+      "Ca să impunem o culoare fluidului",
+      "Ca să controlăm direct turbulența",
+      "Pentru a defini un nivel de referință al presiunii la ieșire, iar solverul calculează singur debitul",
+      "Ca să blocăm curgerea complet"
+    ],
+    "correct_index": 2,
+    "explanation": "Dacă setezi presiunea de ieșire, solverul va ajusta câmpul de viteză astfel încât să satisfacă continuitatea și pierderile de sarcină."
+  },
+
+  {
+    "domain": "nvh",
+    "question": "Ce înseamnă NVH în industria auto?",
+    "choices": [
+      "Noise, Vibration, Harshness (Zgomot, Vibrații, Disconfort)",
+      "Normal Vector Hardness",
+      "Non-Viscous Heat",
+      "Null Viscosity Hypothesis"
+    ],
+    "correct_index": 0,
+    "explanation": "NVH acoperă percepția subiectivă a confortului acustic și vibrațional din vehicul (sunetul motorului, vibrația caroseriei etc.)."
+  },
+  {
+    "domain": "nvh",
+    "question": "Ce este o analiză modală?",
+    "choices": [
+      "O analiză termică a componentelor",
+      "O analiză de deformare plastică",
+      "Calculul frecvențelor proprii și formelor modale ale unei structuri",
+      "Simularea impactului frontal"
+    ],
+    "correct_index": 2,
+    "explanation": "Analiza modală îți spune la ce frecvențe o structură tinde să vibreze natural și cum arată acele forme de vibrație (mode shapes)."
+  },
+  {
+    "domain": "nvh",
+    "question": "Ce este frecvența proprie (natural frequency)?",
+    "choices": [
+      "Frecvența la care structura răspunde cel mai slab",
+      "Frecvența la care structura intră în rezonanță dacă este excitată",
+      "Frecvența motorului termic",
+      "Frecvența undelor acustice în aer liber"
+    ],
+    "correct_index": 1,
+    "explanation": "Dacă excitația (motor, drum, difuzor audio etc.) se potrivește cu o frecvență proprie → apar vibrații mari (rezonanță)."
+  },
+  {
+    "domain": "nvh",
+    "question": "Ce este amortizarea (damping) într-un sistem vibrațional?",
+    "choices": [
+      "Creșterea rigidității structurii",
+      "Reducerea masei totale",
+      "Mecanismul prin care energia vibrației este disipată și nivelul vibrațiilor scade",
+      "Metoda de a crește zgomotul"
+    ],
+    "correct_index": 2,
+    "explanation": "Damping = pierdere de energie (frecare, materiale viscoelastice, izolație). Mai mult damping → vibrații și zgomot mai mici."
+  },
+  {
+    "domain": "nvh",
+    "question": "Ce înseamnă FRF (Frequency Response Function)?",
+    "choices": [
+      "Relația între frecvența curentului electric și tensiunea bateriei",
+      "Relația dintre forța aplicată și răspunsul (deplasare / accelerație) în funcție de frecvență",
+      "Doar amplitudinea presiunii acustice",
+      "Nivelul de uzură al anvelopelor"
+    ],
+    "correct_index": 1,
+    "explanation": "FRF îți spune cât de mult reacționează structura la diferite frecvențe de excitație. E baza în vibrații și acustică."
+  },
+  {
+    "domain": "nvh",
+    "question": "Ce este 'transfer path analysis' (TPA) în NVH?",
+    "choices": [
+      "Analiza traseului combustibilului în motor",
+      "Analiza căii prin care vibrațiile/zgomotele ajung din sursă (motor, drum) până la urechea pasagerului",
+      "Analiza fluxului de aer prin radiator",
+      "Analiza curgerii uleiului"
+    ],
+    "correct_index": 1,
+    "explanation": "TPA urmărește cine transmite zgomotul/vibrația: suport motor, punte spate, anvelope... Te ajută să știi ce componentă trebuie îmbunătățită."
+  },
+  {
+    "domain": "nvh",
+    "question": "Ce înseamnă 'boom' în habitaclu la turații joase ale motorului?",
+    "choices": [
+      "O pierdere de presiune în pneumatică",
+      "Un zgomot grav, continuu, de joasă frecvență resimțit ca un zumzet în caroserie",
+      "O vibrație la 20 kHz",
+      "Fisurarea structurii caroseriei"
+    ],
+    "correct_index": 1,
+    "explanation": "Boom = sunet joasă frecvență, tipic 80-200 Hz, care umple habitaclul. E perceput ca deranjant/obositor."
+  },
+  {
+    "domain": "nvh",
+    "question": "De ce se montează tampoane elastice/izolatoare între motor și șasiu?",
+    "choices": [
+      "Ca să crească turația maximă a motorului",
+      "Ca să reducă transmiterea vibrațiilor motorului către caroserie",
+      "Ca să mărească zgomotul în cabină",
+      "Ca să rigidizeze complet caroseria"
+    ],
+    "correct_index": 1,
+    "explanation": "Izolatorul lasă motorul să se miște puțin independent și reduce vibrația transmisă în cabină prin calea structurală."
+  },
+  {
+    "domain": "nvh",
+    "question": "Ce este un mod acustic într-un volum închis (ex: interiorul mașinii)?",
+    "choices": [
+      "Un mod de vibrație mecanic al tablei caroseriei",
+      "Un tip special de încălzire locală a aerului",
+      "Un model de distribuție a presiunii acustice (valuri staționare) în interiorul cavității",
+      "Un defect de fabricație al difuzoarelor"
+    ],
+    "correct_index": 2,
+    "explanation": "Aerul din habitaclu are propriile frecvențe la care rezonează ca un 'rezonator acustic'. Asta afectează percepția zgomotului."
+  },
+  {
+    "domain": "nvh",
+    "question": "Ce urmărești când faci o analiză de vibrații la ralanti?",
+    "choices": [
+      "Cum variază temperaturile lichidelor",
+      "Ce linii de frecvență generate de motor (ordine armonice) trec prin caroserie până în scaun/volan",
+      "Presiunea din pneuri",
+      "Nivelul de frânare ABS"
+    ],
+    "correct_index": 1,
+    "explanation": "La ralanti motorul are frecvențe joase, repetabile (ordine). Dacă acele ordine se aliniază cu o frecvență proprie slab amortizată → vibrație simțită clar în volan/scaun."
+  },
+  {
+    "domain": "nvh",
+    "question": "De ce se adaugă materiale fonoabsorbante (mochete groase, spumă) în interiorul vehiculului?",
+    "choices": [
+      "Pentru a crește greutatea cât mai mult",
+      "Pentru a reduce contactul electric între componente",
+      "Pentru a absorbi energia acustică și a reduce zgomotul perceput în cabină",
+      "Pentru a întări structura șasiului"
+    ],
+    "correct_index": 2,
+    "explanation": "Materialele fonoabsorbante convertesc energia acustică în căldură și reduc reflexiile interne → mai puțin zgomot în cabină."
   }
 ]
