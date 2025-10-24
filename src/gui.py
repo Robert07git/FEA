@@ -1,14 +1,11 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import threading
-import time
+import subprocess
+import os
 
 # importăm logica noastră existentă
 from data_loader import load_questions
-from quiz_logic import run_quiz
 from stats import show_dashboard  # pentru progres text
-import subprocess
-import os
 
 # Căi utile
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -28,46 +25,115 @@ DOMENII_OPTIUNI = {
 
 class QuizWindow(tk.Toplevel):
     """
-    Fereastra în care efectiv se rulează quiz-ul și se afișează scorul final.
-    Pentru versiunea 1, rulăm quiz-ul în thread separat cu run_quiz și afișăm doar rezultatul final.
-
-    Versiunea 2 o să facă întrebările interactive în GUI (una câte una).
+    Versiunea 2: rulăm quiz-ul direct în GUI, întrebare cu întrebare.
+    Fără input() în consolă, fără thread blocant.
     """
 
     def __init__(self, master, domeniu, num_intrebari, mode, time_limit_sec):
         super().__init__(master)
-        self.title("FEA Quiz - Sesie Quiz")
-        self.geometry("500x400")
+        self.title("FEA Quiz - Sesiune Quiz")
+        self.geometry("520x520")
         self.configure(bg="#111111")
 
         self.domeniu = domeniu
         self.num_intrebari = num_intrebari
-        self.mode = mode
-        self.time_limit_sec = time_limit_sec
+        self.mode = mode  # "train" sau "exam"
+        self.time_limit_sec = time_limit_sec  # TODO: timer vizual în versiunea următoare
 
-        # UI simplu: status + rezultat + buton Close
-        self.label_status = tk.Label(
+        # 1. încărcăm întrebările
+        all_q = load_questions(domain=self.domeniu)
+        if len(all_q) == 0:
+            # fallback la mix
+            all_q = load_questions(domain="mix")
+
+        # tăiem la numărul cerut (notă: în viitor putem randomiza)
+        self.questions = all_q[: self.num_intrebari]
+
+        # 2. state joc
+        self.current_index = 0          # întrebarea curentă
+        self.correct_count = 0          # câte ai nimerit corect
+        self.asked_count = 0            # câte au fost puse
+        self.gresite = []               # pt review la EXAM (sau studiu ulterior)
+
+        # 3. UI ELEMENTS
+
+        # header cu domeniu și mod
+        self.lbl_header = tk.Label(
             self,
-            text="Rulez testul...",
+            text=f"Domeniu: {self.domeniu} | Mod: {self.mode.upper()}",
+            fg="#00D4FF",
+            bg="#111111",
+            font=("Segoe UI", 10, "bold"),
+            wraplength=480,
+            justify="left"
+        )
+        self.lbl_header.pack(pady=(15,5))
+
+        # întrebare
+        self.lbl_question = tk.Label(
+            self,
+            text="Întrebare aici...",
             fg="#FFFFFF",
             bg="#111111",
-            font=("Segoe UI", 12, "bold"),
-            wraplength=460,
+            font=("Segoe UI", 10, "bold"),
+            wraplength=480,
             justify="left"
         )
-        self.label_status.pack(pady=20)
+        self.lbl_question.pack(pady=(10,5))
 
-        self.label_result = tk.Label(
+        # zona cu variante
+        self.answer_var = tk.IntVar(value=-1)
+        self.frame_choices = tk.Frame(self, bg="#111111")
+        self.frame_choices.pack(pady=(5,10), fill="x")
+
+        self.choice_buttons = []
+        for i in range(4):
+            rb = tk.Radiobutton(
+                self.frame_choices,
+                text=f"Varianta {i+1}",
+                variable=self.answer_var,
+                value=i,
+                bg="#111111",
+                fg="#FFFFFF",
+                activebackground="#111111",
+                activeforeground="#00D4FF",
+                selectcolor="#1F1F1F",
+                wraplength=460,
+                justify="left",
+                anchor="w"
+            )
+            rb.pack(anchor="w", pady=2)
+            self.choice_buttons.append(rb)
+
+        # feedback pentru TRAIN (sau mesaj de confirmare pentru EXAM)
+        self.lbl_feedback = tk.Label(
             self,
             text="",
-            fg="#CCCCCC",
+            fg="#AAAAAA",
             bg="#111111",
-            font=("Segoe UI", 10),
-            wraplength=460,
+            font=("Segoe UI", 9),
+            wraplength=480,
             justify="left"
         )
-        self.label_result.pack(pady=10)
+        self.lbl_feedback.pack(pady=(5,10))
 
+        # butonul principal (next / submit)
+        self.btn_next = tk.Button(
+            self,
+            text="Răspunde / Următoarea",
+            command=self.on_submit_answer,
+            bg="#00D4FF",
+            fg="#000000",
+            activebackground="#00AACC",
+            activeforeground="#000000",
+            relief="flat",
+            padx=12,
+            pady=8,
+            font=("Segoe UI", 10, "bold")
+        )
+        self.btn_next.pack(pady=(10,10))
+
+        # buton închidere fereastră
         self.btn_close = tk.Button(
             self,
             text="Închide",
@@ -77,79 +143,155 @@ class QuizWindow(tk.Toplevel):
             activebackground="#444444",
             activeforeground="#FFFFFF",
             relief="flat",
-            padx=16,
+            padx=12,
             pady=8
         )
-        self.btn_close.pack(pady=20)
+        self.btn_close.pack(pady=(0,20))
 
-        # rulăm quiz-ul într-un thread separat ca să nu înghețe GUI-ul
-        t = threading.Thread(target=self.run_quiz_and_show_result, daemon=True)
-        t.start()
+        # 4. afișăm prima întrebare
+        self.show_current_question()
 
-    def run_quiz_and_show_result(self):
-        """
-        Rulează run_quiz (din consola noastră logică) și apoi afișează scorul final în fereastră.
-        Pentru moment, ne folosim de motorul existent, fără interacțiune grafică întrebare-cu-întrebare.
+    def show_current_question(self):
+        """Afișează întrebarea curentă și cele 4 opțiuni de răspuns în UI."""
+        if self.current_index >= len(self.questions):
+            # gata testul
+            self.end_quiz()
+            return
 
-        În versiunea următoare putem controla 100% întrebările în UI (pas cu pas).
-        """
-        try:
-            # încărcăm întrebările
-            questions = load_questions(domain=self.domeniu)
+        qdata = self.questions[self.current_index]
+        q_text = qdata["question"]
+        choices = qdata["choices"]
 
-            if len(questions) == 0:
-                self.safe_set_text(self.label_status,
-                    "Nu există întrebări pentru domeniul ales. Folosesc MIX.")
-                questions = load_questions(domain="mix")
+        # întrebarea
+        self.lbl_question.config(
+            text=f"Q{self.current_index+1}: {q_text}"
+        )
 
-            # apelăm run_quiz
-            start = time.time()
-            score, asked, results = run_quiz(
-                questions=questions,
-                num_questions=self.num_intrebari,
-                mode=self.mode,
-                time_limit_sec=self.time_limit_sec
-            )
-            end = time.time()
-            durata = end - start
+        # resetăm selecția
+        self.answer_var.set(-1)
 
-            pct = (score / asked * 100.0) if asked else 0.0
-
-            # feedback calitativ la final (reusăm aceeași logică ca în main.py)
-            if pct >= 80:
-                feedback = "Bravo, ești pe drumul bun pentru un interviu CAE junior 👌"
-            elif pct >= 50:
-                feedback = "E ok, dar mai lucrează la conceptele mai slabe din domeniul ales."
+        # actualizăm opțiunile
+        for i, rb in enumerate(self.choice_buttons):
+            if i < len(choices):
+                rb.config(text=f"{i+1}. {choices[i]}", state="normal")
             else:
-                feedback = "Nu-i panică. Reia teoria de bază. Asta se învață 💪"
+                rb.config(text=f"{i+1}. -", state="disabled")
 
-            rezumat = []
-            rezumat.append(f"Scor: {score}/{asked}")
-            rezumat.append(f"Procent: {pct:.1f}%")
-            rezumat.append(f"Timp total: {durata:.1f} sec (~{durata/60:.1f} min)")
-            rezumat.append(f"Mod: {self.mode.upper()}")
-            rezumat.append("")
-            rezumat.append(feedback)
+        # ștergem feedback-ul anterior
+        self.lbl_feedback.config(text="")
 
-            # dacă am fost în modul EXAM, putem sumariza greșelile ca în consolă
-            if self.mode == "exam":
-                gresite = [r for r in results if not r["correct"]]
-                if gresite:
-                    rezumat.append("")
-                    rezumat.append("Întrebări de revizuit:")
-                    for r in gresite[:3]:  # primele 3 doar, ca să nu fie roman
-                        rezumat.append(f"- Q{r['idx']} ({r['domain']})")
+        # schimbăm butonul pentru starea curentă
+        if self.current_index == len(self.questions) - 1:
+            # ultima întrebare
+            self.btn_next.config(text="Finalizare / Scor")
+        else:
+            self.btn_next.config(text="Răspunde / Următoarea")
 
-            self.safe_set_text(self.label_status, "Test finalizat ✅")
-            self.safe_set_text(self.label_result, "\n".join(rezumat))
+    def on_submit_answer(self):
+        """User apasă pe 'Răspunde / Următoarea'."""
+        if self.current_index >= len(self.questions):
+            # dacă deja am terminat, doar afișăm scorul
+            self.end_quiz()
+            return
 
-        except Exception as e:
-            self.safe_set_text(self.label_status, "Eroare în rularea testului.")
-            self.safe_set_text(self.label_result, str(e))
+        qdata = self.questions[self.current_index]
+        correct_idx = qdata["correct_index"]
+        explanation = qdata["explanation"]
+        domeniu_q = qdata.get("domain", self.domeniu)
 
-    def safe_set_text(self, widget, text):
-        # ca să actualizăm UI din threadul worker în threadul principal Tk
-        widget.after(0, lambda: widget.config(text=text))
+        selected = self.answer_var.get()
+
+        # am pus întrebarea -> creștem asked_count
+        self.asked_count += 1
+
+        corect = (selected == correct_idx)
+        if corect:
+            self.correct_count += 1
+        else:
+            # salvăm pt revizuire / EXAM feedback
+            self.gresite.append({
+                "idx": self.current_index+1,
+                "domain": domeniu_q,
+                "question": qdata["question"],
+                "choices": qdata["choices"],
+                "correct_index": qdata["correct_index"],
+                "explanation": qdata["explanation"]
+            })
+
+        # în mod TRAIN: arătăm imediat dacă e corect + explicația
+        if self.mode == "train":
+            if corect:
+                fb = "Corect ✅\n"
+            else:
+                fb = "Greșit ❌\n"
+                fb += (
+                    f"Răspuns corect: {correct_idx+1}. "
+                    f"{qdata['choices'][correct_idx]}\n"
+                )
+            fb += f"Explicație: {explanation}"
+            self.lbl_feedback.config(text=fb)
+        else:
+            # EXAM: nu arătăm explicația acum
+            self.lbl_feedback.config(text="Răspuns înregistrat.")
+
+        # mergem la următoarea întrebare
+        self.current_index += 1
+
+        # dacă am terminat întrebările -> afișăm scorul final
+        if self.current_index >= len(self.questions):
+            self.end_quiz()
+        else:
+            # altfel afișăm următoarea întrebare
+            self.show_current_question()
+
+    def end_quiz(self):
+        """Afișează scorul final + revizuire (dacă e EXAM)."""
+        if self.asked_count == 0:
+            pct = 0.0
+        else:
+            pct = (self.correct_count / self.asked_count) * 100.0
+
+        if pct >= 80:
+            feedback = "Bravo, ești pe drumul bun pentru un interviu CAE junior 👌"
+        elif pct >= 50:
+            feedback = "E ok, dar mai lucrează la conceptele mai slabe din domeniul ales."
+        else:
+            feedback = "Nu-i panică. Reia teoria de bază. Asta se învață 💪"
+
+        summary_lines = []
+        summary_lines.append("=== REZULTAT FINAL ===")
+        summary_lines.append(f"Scor: {self.correct_count}/{self.asked_count}")
+        summary_lines.append(f"Procent: {pct:.1f}%")
+        summary_lines.append(f"Mod: {self.mode.upper()}")
+        summary_lines.append("")
+        summary_lines.append(feedback)
+
+        # dacă suntem în exam, afișăm întrebările pentru revizuit
+        if self.mode == "exam" and self.gresite:
+            summary_lines.append("")
+            summary_lines.append("Întrebări pentru revizuit:")
+            for r in self.gresite:
+                good = r["choices"][r["correct_index"]]
+                summary_lines.append(f"- Q{r['idx']} ({r['domain']}) -> {r['question']}")
+                summary_lines.append(f"  Răspuns corect: {good}")
+                summary_lines.append(f"  Explicație: {r['explanation']}")
+                summary_lines.append("")
+
+        final_text = "\n".join(summary_lines)
+
+        # Afișăm rezultatul în locul întrebării
+        self.lbl_question.config(text=final_text)
+
+        # Dezactivăm opțiunile de răspuns
+        for rb in self.choice_buttons:
+            rb.config(state="disabled")
+
+        # curățăm feedback
+        self.lbl_feedback.config(text="")
+
+        # dezactivăm butonul Next
+        self.btn_next.config(state="disabled")
+        # la final utilizatorul poate apăsa "Închide"
 
 
 class MainWindow(tk.Tk):
@@ -159,22 +301,26 @@ class MainWindow(tk.Tk):
     - alegi domeniu
     - alegi nr. întrebări
     - alegi TRAIN vs EXAM
-    - setezi timpul pe întrebare dacă e EXAM
+    - setezi timpul pe întrebare (în viitor pt timer)
     - rulezi quiz-ul (deschide QuizWindow)
     - generezi PDF din ultimul EXAM
     - generezi grafic de progres
+    - vezi progres text (stats)
     """
 
     def __init__(self):
         super().__init__()
         self.title("FEA Quiz Trainer")
-        self.geometry("480x520")
+        self.geometry("900x600")
         self.configure(bg="#0F0F0F")
 
-        # stiluri simple
         label_style = {"bg": "#0F0F0F", "fg": "#FFFFFF", "font": ("Segoe UI", 10, "bold")}
-        field_style = {"bg": "#1F1F1F", "fg": "#FFFFFF", "insertbackground": "#FFFFFF",
-                       "relief": "flat"}
+        field_style = {
+            "bg": "#1F1F1F",
+            "fg": "#FFFFFF",
+            "insertbackground": "#FFFFFF",
+            "relief": "flat"
+        }
 
         section_title = tk.Label(
             self,
@@ -187,7 +333,6 @@ class MainWindow(tk.Tk):
 
         # Domeniu
         tk.Label(self, text="Domeniu:", **label_style).pack(anchor="w", padx=30)
-
         self.combo_domain = ttk.Combobox(
             self,
             values=list(DOMENII_OPTIUNI.keys()),
@@ -235,7 +380,11 @@ class MainWindow(tk.Tk):
         rb_exam.pack(anchor="w")
 
         # Timp per întrebare
-        tk.Label(self, text="Timp pe întrebare (secunde, doar EXAM):", **label_style).pack(anchor="w", padx=30)
+        tk.Label(
+            self,
+            text="Timp pe întrebare (secunde, doar EXAM):",
+            **label_style
+        ).pack(anchor="w", padx=30)
         self.entry_time = tk.Entry(self, **field_style)
         self.entry_time.insert(0, "15")
         self.entry_time.pack(padx=30, fill="x", pady=(0,20))
@@ -335,7 +484,6 @@ class MainWindow(tk.Tk):
             messagebox.showerror("Eroare", "Mod invalid.")
             return
 
-        # timp per întrebare (doar dacă e EXAM)
         if mode == "exam":
             try:
                 tsec = int(self.entry_time.get().strip())
@@ -351,7 +499,7 @@ class MainWindow(tk.Tk):
         else:
             tsec = None
 
-        # deschidem o fereastră nouă care rulează quiz-ul în thread
+        # deschidem o fereastră nouă care rulează quiz-ul în GUI
         QuizWindow(
             master=self,
             domeniu=domeniu_real,
@@ -361,9 +509,9 @@ class MainWindow(tk.Tk):
         )
 
     def generate_chart(self):
-        # rulăm progres_chart.py ca script separat
+        # rulăm progress_chart.py ca script separat
         try:
-            subprocess.run(
+            result = subprocess.run(
                 ["python", CHART_SCRIPT],
                 check=True,
                 capture_output=True,
@@ -373,7 +521,7 @@ class MainWindow(tk.Tk):
             if os.path.exists(PROGRESS_IMG_PATH):
                 messagebox.showinfo(
                     "Grafic generat",
-                    f"Graficul a fost salvat ca:\n{PROGRESS_IMG_PATH}\n\nDeschide PNG-ul să vezi trendul scorurilor tale."
+                    f"Graficul a fost salvat ca:\n{PROGRESS_IMG_PATH}\n\nPoți deschide PNG-ul să vezi trendul scorurilor tale."
                 )
             else:
                 messagebox.showwarning(
@@ -398,11 +546,9 @@ class MainWindow(tk.Tk):
             messagebox.showerror("Eroare la PDF", e.stderr or str(e))
 
     def show_stats_popup(self):
-        # rulăm show_dashboard() și punem rezultatul într-o fereastră mică
-        # (show_dashboard() scrie direct în consolă, deci îl capturăm într-un buffer)
+        # capturăm outputul din show_dashboard() într-un popup
         import io
         import sys
-
         buf = io.StringIO()
         old_stdout = sys.stdout
         sys.stdout = buf
@@ -415,7 +561,6 @@ class MainWindow(tk.Tk):
 
         content = buf.getvalue()
 
-        # popup text scrollabil
         win = tk.Toplevel(self)
         win.title("Progres personal (stats)")
         win.geometry("480x320")
