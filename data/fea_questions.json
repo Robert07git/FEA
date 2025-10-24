@@ -1,0 +1,112 @@
+[
+  {
+    "question": "Ce reprezintă un grad de libertate (DOF) într-un nod 3D pentru un element solid clasic?",
+    "choices": [
+      "Numărul de elemente conectate la nod",
+      "Direcțiile independente în care nodul poate să se deplaseze",
+      "Numărul de iterații în solver",
+      "Dimensiunea elementului"
+    ],
+    "correct_index": 1,
+    "explanation": "Un DOF (degree of freedom) este o posibilă mișcare independentă. Pentru un element solid 3D tipic ai 3 DOF pe nod: deplasare în X, Y, Z."
+  },
+  {
+    "question": "La ce folosește o condiție la limită (boundary condition / BC) de tip 'fixed'?",
+    "choices": [
+      "Aplică o forță constantă pe un nod",
+      "Blochează complet translațiile și rotațiile acelui nod",
+      "Optimizează mesh-ul automat",
+      "Setează materialul ca rigid"
+    ],
+    "correct_index": 1,
+    "explanation": "O prindere 'fixed' ideală înseamnă că nodul nu are voie să se miște sau să se rotească: toate DOF sunt blocate."
+  },
+  {
+    "question": "Care este diferența principală dintre un element solid (hexa/tetra) și un element shell?",
+    "choices": [
+      "Shell are grosime mică și poate reprezenta plăci / tablă, solidul reprezintă volum 3D",
+      "Shell este mereu mai precis decât solidul",
+      "Shell nu poate avea proprietăți de material",
+      "Solidul nu poate suporta încărcări la compresiune"
+    ],
+    "correct_index": 0,
+    "explanation": "Elementele shell sunt folosite pentru structuri subțiri (caroserie auto, tablă), au grosime definită separat. Elementele solid modelează volum 3D complet."
+  },
+  {
+    "question": "De ce e important raportul de aspect (aspect ratio) al elementelor în mesh?",
+    "choices": [
+      "Determină culoarea modelului în post-procesare",
+      "Controlează stabilitatea numerică și acuratețea rezultatelor",
+      "Nu are nicio importanță la FEA implicită",
+      "Determină dacă solverul rulează pe CPU sau GPU"
+    ],
+    "correct_index": 1,
+    "explanation": "Elementele foarte 'alungite' (aspect ratio mare) dau erori numerice și stres artificial. Mesh-ul de calitate are elemente cât mai aproape de forme regulate."
+  },
+  {
+    "question": "Ce înseamnă contact în analiza de impact (crash)?",
+    "choices": [
+      "O constrângere care interzice penetrarea dintre două suprafețe",
+      "O metodă de a mări grosimea materialului",
+      "O funcție de randare grafică",
+      "O condiție de temperatură constantă"
+    ],
+    "correct_index": 0,
+    "explanation": "Contactul definește interacțiunea dintre două piese când se lovesc sau se ating, prevenind interpenetrarea și permițând frecare."
+  },
+  {
+    "question": "Ce reprezintă o curbă forță–deplasare într-un test de crash local (ex. impact frontal într-o zonă de longeroane)?",
+    "choices": [
+      "Rezistența structurală și modul de absorbție a energiei",
+      "Viteza solverului",
+      "Doar rigiditatea elastică, fără plasticitate",
+      "Doar masa vehiculului"
+    ],
+    "correct_index": 0,
+    "explanation": "Forță–deplasare îți arată câtă forță preia structura pe măsură ce se deformează. Practic vezi cum absoarbe energie la impact."
+  },
+  {
+    "question": "De ce aplicăm condiții de simetrie în FEA?",
+    "choices": [
+      "Ca să colorăm doar jumătate din model",
+      "Ca să reducem dimensiunea modelului și timpul de calcul",
+      "Ca să creștem grosimea materialului",
+      "Ca să anulăm frecarea în contact"
+    ],
+    "correct_index": 1,
+    "explanation": "Dacă piesa și încărcarea sunt simetrice, poți modela doar jumătate / un sfert. Economisești elemente și timp de rulare enorm."
+  },
+  {
+    "question": "Ce tip de element folosești de obicei pentru modelarea caroseriei auto într-o analiză de crash frontal?",
+    "choices": [
+      "Elemente solid hexa volumice groase",
+      "Elemente beam 1D",
+      "Elemente shell subțiri cu grosime definită",
+      "Doar puncte fără conectivitate"
+    ],
+    "correct_index": 2,
+    "explanation": "Caroseria (tablă presată) se modelează aproape întotdeauna cu shell-uri. Asta reduce numărul de elemente dar păstrează comportamentul corect."
+  },
+  {
+    "question": "Ce înseamnă 'material plastic' într-o simulare de impact?",
+    "choices": [
+      "Material care se evaporă la încălzire",
+      "Material care rămâne complet elastic după descărcare",
+      "Material care poate suferi deformații permanente",
+      "Material care nu are densitate"
+    ],
+    "correct_index": 2,
+    "explanation": "Plastic = după ce ai scos încărcarea, nu revine la forma inițială complet. E esențial pentru crash deoarece energia se disipă prin deformare permanentă."
+  },
+  {
+    "question": "De ce definim mase concentrate (lumped masses) în unele modele?",
+    "choices": [
+      "Ca să trișăm solverul și să termine instant",
+      "Ca să simulăm inerția unor componente fără să le meshuim geometric detaliat",
+      "Ca să blocăm toate DOF-urile",
+      "Ca să anulăm gravitația"
+    ],
+    "correct_index": 1,
+    "explanation": "Dacă ai, de exemplu, un motor reprezentat doar ca un bloc simplificat, îi poți pune masa totală ca 'lumped mass' ca să păstrezi inerția fără mesh foarte fin."
+  }
+]
