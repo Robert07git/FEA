@@ -4,14 +4,43 @@ import threading
 import time
 import platform
 import os
+import json
 
 from data_loader import load_questions
-from stats import show_dashboard as show_stats  # ✅ corectat
+from stats import show_dashboard as show_stats
 from export_pdf import main as export_pdf
 from progress_chart import main as generate_chart
 
 
-# ===== Funcție cross-platform pentru beep sonor =====
+# ===== CONFIG PATH =====
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
+
+
+def save_config(domain, num, mode, time_limit):
+    config = {
+        "domain": domain,
+        "num_questions": num,
+        "mode": mode,
+        "time_limit": time_limit
+    }
+    try:
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=4)
+    except Exception as e:
+        print("Eroare la salvarea config:", e)
+
+
+def load_config():
+    if not os.path.exists(CONFIG_PATH):
+        return {"domain": "structural", "num_questions": 5, "mode": "train", "time_limit": 15}
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"domain": "structural", "num_questions": 5, "mode": "train", "time_limit": 15}
+
+
+# ===== Funcție cross-platform pentru beep =====
 def beep():
     try:
         if platform.system() == "Windows":
@@ -50,13 +79,11 @@ class QuizWindow(tk.Toplevel):
         self.create_widgets()
         self.show_question()
 
-    # --------------------------- UI Setup ---------------------------
     def create_widgets(self):
         self.lbl_title = tk.Label(self, text=f"Domeniu: {self.domain} | Mod: {self.mode.upper()}",
                                   font=("Segoe UI", 11, "bold"), fg="#00ffff", bg="#111")
         self.lbl_title.pack(pady=8)
 
-        # Timer vizibil + bară progres
         self.lbl_timer = tk.Label(self, text="", font=("Segoe UI", 10, "bold"), fg="#00ff88", bg="#111")
         self.lbl_timer.pack(pady=3)
 
@@ -108,7 +135,6 @@ class QuizWindow(tk.Toplevel):
             self.progress_var.set(percent)
             self.update_timer_label()
 
-            # Beep când mai rămân 5 secunde
             if self.remaining_time == 5:
                 beep()
 
@@ -157,7 +183,6 @@ class QuizWindow(tk.Toplevel):
             if is_correct:
                 self.score += 1
 
-        # Feedback instant doar în TRAIN
         if self.mode == "train":
             if timeout:
                 self.lbl_feedback.config(text="⏰ Timp expirat!")
@@ -204,62 +229,55 @@ class FEAGui(tk.Tk):
         self.title("FEA Quiz Trainer")
         self.geometry("950x700")
         self.configure(bg="#111")
+
+        self.config_data = load_config()
         self.create_main_widgets()
 
     def create_main_widgets(self):
         title = tk.Label(self, text="Setări sesiune", font=("Segoe UI", 12, "bold"), fg="#00ffff", bg="#111")
         title.pack(pady=10)
 
-        # Domeniu
         tk.Label(self, text="Domeniu:", font=("Segoe UI", 9, "bold"), fg="white", bg="#111").pack()
-        self.domain_var = tk.StringVar(value="structural")
+        self.domain_var = tk.StringVar(value=self.config_data.get("domain", "structural"))
         domain_box = ttk.Combobox(self, textvariable=self.domain_var, width=50,
                                   values=["structural", "crash", "moldflow", "cfd", "nvh", "mix"])
         domain_box.pack(pady=5)
 
-        # Număr întrebări
         tk.Label(self, text="Număr întrebări:", font=("Segoe UI", 9, "bold"), fg="white", bg="#111").pack()
-        self.num_var = tk.IntVar(value=5)
+        self.num_var = tk.IntVar(value=self.config_data.get("num_questions", 5))
         tk.Spinbox(self, from_=1, to=50, textvariable=self.num_var, width=5).pack(pady=5)
 
-        # Mod
         tk.Label(self, text="Mod:", font=("Segoe UI", 9, "bold"), fg="white", bg="#111").pack()
-        self.mode_var = tk.StringVar(value="train")
+        self.mode_var = tk.StringVar(value=self.config_data.get("mode", "train"))
         tk.Radiobutton(self, text="TRAIN (feedback imediat)", variable=self.mode_var, value="train",
                        bg="#111", fg="white", selectcolor="#222").pack()
         tk.Radiobutton(self, text="EXAM (limită timp, feedback la final)", variable=self.mode_var, value="exam",
                        bg="#111", fg="white", selectcolor="#222").pack()
 
-        # Timp per întrebare
         tk.Label(self, text="Timp per întrebare (secunde, doar EXAM):", font=("Segoe UI", 9, "bold"), fg="white", bg="#111").pack()
-        self.time_var = tk.IntVar(value=15)
+        self.time_var = tk.IntVar(value=self.config_data.get("time_limit", 15))
         tk.Spinbox(self, from_=5, to=120, textvariable=self.time_var, width=5).pack(pady=5)
 
-        # Start quiz
         tk.Button(self, text="Start Quiz", bg="#00bfff", fg="white", font=("Segoe UI", 11, "bold"),
                   command=self.start_quiz).pack(pady=10)
 
         ttk.Separator(self, orient="horizontal").pack(fill="x", pady=10)
 
-        # Secțiune rapoarte
         tk.Label(self, text="Rapoarte & Analiză", font=("Segoe UI", 11, "bold"), fg="#00ffff", bg="#111").pack(pady=5)
-
         tk.Button(self, text="Generează grafic progres (.png)", bg="#333", fg="white",
                   font=("Segoe UI", 10), command=self.run_chart).pack(pady=5)
-
         tk.Button(self, text="Generează PDF din ultimul EXAM", bg="#333", fg="white",
                   font=("Segoe UI", 10), command=self.run_pdf).pack(pady=5)
-
         tk.Button(self, text="Arată progres text (stats)", bg="#333", fg="white",
                   font=("Segoe UI", 10), command=self.run_stats).pack(pady=5)
 
-    # --------------------------- Funcții principale ---------------------------
     def start_quiz(self):
         domain = self.domain_var.get()
         num = self.num_var.get()
         mode = self.mode_var.get()
         time_per_q = self.time_var.get() if mode == "exam" else 0
 
+        save_config(domain, num, mode, time_per_q)
         win = QuizWindow(self, domain, num, mode, time_per_q)
         win.grab_set()
 
