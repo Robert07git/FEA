@@ -7,7 +7,7 @@ import sys
 # Adaugă automat folderul src în path, dacă rulezi din afara lui
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from quiz_core import load_questions
+from quiz_logic import load_questions  # ✅ FIX: înlocuit quiz_core cu quiz_logic
 from stats import show_stats
 from progress_chart import main as generate_chart
 from export_pdf import main as export_pdf
@@ -118,7 +118,7 @@ class QuizWindow(tk.Toplevel):
         else:
             feedback = f"❌ Greșit! Răspuns corect: {correct}. {q['choices'][correct-1]}"
 
-        # Afișează explicația doar în TRAIN mode
+        # ✅ Afișează explicația doar în TRAIN mode
         if self.mode == "TRAIN":
             self.label_explanation.config(text=f"Explicație: {q['explanation']}")
 
