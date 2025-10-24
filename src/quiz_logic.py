@@ -1,10 +1,9 @@
 import random
 import time
 import sys
-import os
 
 # Pentru citire cu timeout pe Windows folosim msvcrt.
-# Dacă rulezi pe Windows (ceea ce faci acum), asta merge perfect.
+# Dacă nu e Windows, fallback fără timeout.
 try:
     import msvcrt
     HAS_MS = True
@@ -12,19 +11,26 @@ except ImportError:
     HAS_MS = False
 
 
-def _timed_input(prompt: str, timeout_seconds: int):
+def _timed_input(prompt: str, timeout_seconds: int | None):
     """
-    Cere input de la utilizator cu timeout.
-    Dacă utilizatorul nu răspunde în timpul dat, returnează None.
-    Implementare pentru Windows (msvcrt). Dacă nu e Windows, cade pe input normal.
+    Citește input de la utilizator cu timeout (dacă timeout_seconds nu e None).
+    Dacă timeout_seconds este None -> comportament normal input() fără limită.
+
+    Returnează:
+    - stringul tastat (fără whitespace la capete), sau
+    - None dacă a expirat timpul (doar în modul cu timeout)
     """
-    # dacă nu avem msvcrt (alt OS), facem fallback fără timeout
-    if not HAS_MS:
-        # fallback simplu: fără timeout
+    # Fără limită de timp: folosim input normal
+    if timeout_seconds is None:
         answer = input(prompt)
         return answer.strip()
 
-    # Windows + msvcrt: citim caracter cu caracter, cu timeout
+    # Dacă nu avem msvcrt (alt OS decât Windows), fallback fără timeout
+    if not HAS_MS:
+        answer = input(prompt)
+        return answer.strip()
+
+    # Windows + msvcrt: citim tastă cu tastă, cu timeout
     sys.stdout.write(prompt)
     sys.stdout.flush()
 
@@ -32,56 +38,64 @@ def _timed_input(prompt: str, timeout_seconds: int):
     start = time.time()
 
     while True:
-        # dacă a tastat ceva
+        # dacă utilizatorul tastează ceva
         if msvcrt.kbhit():
-            ch = msvcrt.getwch()  # getwch păstrează diacritice/UTF-16 corect
+            ch = msvcrt.getwch()  # getwch -> suportă Unicode/diacritice
 
-            # Enter -> finalizăm inputul
+            # Enter => finalizează inputul
             if ch == "\r" or ch == "\n":
                 sys.stdout.write("\n")
                 sys.stdout.flush()
                 return entered.strip()
 
-            # Backspace -> ștergem ultimul caracter vizual și logic
+            # Backspace => ștergem ultimul char
             if ch == "\b":
                 if len(entered) > 0:
                     entered = entered[:-1]
-                    # Șterge caracterul de pe ecran
+                    # ștergere vizuală
                     sys.stdout.write("\b \b")
                     sys.stdout.flush()
                 continue
 
-            # Caracter normal -> îl adăugăm și îl afișăm
+            # caracter normal
             entered += ch
             sys.stdout.write(ch)
             sys.stdout.flush()
 
-        # timeout?
+        # verifică timeout
         if (time.time() - start) > timeout_seconds:
             sys.stdout.write("\n")
             sys.stdout.flush()
             return None
 
-        # mică pauză ca să nu blocăm CPU
         time.sleep(0.05)
 
 
-def run_quiz(questions, num_questions=10, time_limit_sec=15):
+def run_quiz(questions, num_questions=10, mode="train", time_limit_sec=None):
     """
     Rulează quiz-ul.
-    - questions: listă de întrebări (dict cu 'question', 'choices', 'correct_index', 'explanation')
-    - num_questions: câte întrebări să pună în test
-    - time_limit_sec: câte secunde are user-ul să răspundă la fiecare întrebare
+
+    Parametri:
+    - questions: list[dict] cu chei:
+        "question", "choices", "correct_index", "explanation", "domain"
+    - num_questions: câte întrebări se scot în sesiune
+    - mode: "train" sau "exam"
+        * train -> fără limită de timp, feedback imediat
+        * exam  -> limită de timp, feedback abia la final
+    - time_limit_sec: secunde per întrebare în modul exam.
+                      ignorat dacă mode == "train"
 
     Returnează:
-    - score (răspunsuri corecte)
-    - asked (câte întrebări au fost puse)
+    - score: câte răspunsuri corecte
+    - asked: câte întrebări au fost puse
+    - results: list de dict cu detalii pe fiecare întrebare
     """
 
-    # amestecăm întrebările și alegem primele num_questions
+    # amestecăm întrebările și alegem primele N
     random.shuffle(questions)
     selected = questions[:num_questions]
 
+    results = []
     score = 0
     asked = 0
 
@@ -92,61 +106,85 @@ def run_quiz(questions, num_questions=10, time_limit_sec=15):
         explanation = q.get("explanation", "(fără explicație)")
         domain = q.get("domain", "n/a")
 
-        # litere pentru afișat răspunsuri: A, B, C, D...
-        letters = ["A", "B", "C", "D", "E", "F"]
-
         print("------------------------------------------------------------")
         print(f"Q{idx}: {question_text}")
         print(f"(domeniu: {domain})")
         print()
 
-        # afișăm opțiunile numerotate
         for i, choice in enumerate(choices):
-            # ex: "1. Aplica o forta constanta pe un nod"
             print(f"{i+1}. {choice}")
         print()
 
-        # cerem răspuns cu timeout
-        answer_raw = _timed_input(
-            f"Răspunsul tău (1-{len(choices)}) [timp: {time_limit_sec}s]: ",
-            timeout_seconds=time_limit_sec
-        )
-
-        # determinăm corectitudinea
-        if answer_raw is None:
-            # timp expirat
-            print("\nTimp expirat ⏱️")
-            chosen_index = None
+        # construim prompt-ul în funcție de mod
+        if mode == "exam":
+            prompt = f"Răspunsul tău (1-{len(choices)}) [timp: {time_limit_sec}s]: "
+            timeout = time_limit_sec
         else:
-            # încearcă să convertească la int
+            prompt = f"Răspunsul tău (1-{len(choices)}): "
+            timeout = None  # fără limită de timp
+
+        answer_raw = _timed_input(prompt, timeout)
+
+        # determinăm indexul ales
+        timed_out = (answer_raw is None)
+        chosen_index = None
+
+        if not timed_out:
             try:
                 chosen_index = int(answer_raw) - 1
-            except ValueError:
+            except (TypeError, ValueError):
                 chosen_index = None
 
-        # feedback
-        if chosen_index is not None and 0 <= chosen_index < len(choices):
-            # avem răspuns valid numeric
-            print(f"\nAi răspuns: {chosen_index+1}")
-            if chosen_index == correct_index:
-                print("Corect ✅")
-                score += 1
-            else:
-                print("Greșit ❌")
-                print(
-                    f"Răspuns corect: {correct_index+1}. {choices[correct_index]}"
-                )
-        else:
-            # nu a răspuns sau răspuns invalid
-            print("Răspuns invalid sau lipsă răspuns ❌")
-            print(
-                f"Răspuns corect: {correct_index+1}. {choices[correct_index]}"
-            )
+        # verificăm dacă e corect
+        is_valid_choice = (
+            chosen_index is not None and
+            0 <= chosen_index < len(choices)
+        )
+        is_correct = is_valid_choice and (chosen_index == correct_index)
 
-        # explicație
-        print("Explicație:", explanation)
-        print()
+        if is_correct:
+            score += 1
 
         asked += 1
 
-    return score, asked
+        # feedback diferit în funcție de mod
+        if mode == "train":
+            # în TRAIN spunem imediat dacă e corect și de ce
+            if timed_out:
+                print("\nNu ai răspuns (fără limită de timp în TRAIN, deci asta nu ar trebui să apară).")
+            else:
+                print(f"\nAi răspuns: {answer_raw}")
+                if is_correct:
+                    print("Corect ✅")
+                else:
+                    print("Greșit ❌")
+                    if is_valid_choice:
+                        print(f"Răspuns corect: {correct_index+1}. {choices[correct_index]}")
+                    else:
+                        print("Răspuns invalid.")
+                        print(f"Răspuns corect: {correct_index+1}. {choices[correct_index]}")
+            print("Explicație:", explanation)
+            print()
+
+        else:
+            # în EXAM nu dezvăluim nimic acum
+            if timed_out:
+                print("Timp expirat ⏱️")
+            else:
+                print("Răspuns înregistrat.")
+            print()
+
+        # salvăm rezultatul acestei întrebări pentru analiză finală (mai ales la EXAM)
+        results.append({
+            "idx": idx,
+            "domain": domain,
+            "question": question_text,
+            "choices": choices,
+            "correct_index": correct_index,
+            "user_index": chosen_index,
+            "timed_out": timed_out,
+            "correct": is_correct,
+            "explanation": explanation,
+        })
+
+    return score, asked, results
