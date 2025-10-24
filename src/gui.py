@@ -2,19 +2,33 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 import time
+import platform
+import os
 
 from data_loader import load_questions
-from quiz_logic import run_quiz
 from stats import show_dashboard as show_stats  # ✅ corectat
 from export_pdf import main as export_pdf
 from progress_chart import main as generate_chart
 
 
+# ===== Funcție cross-platform pentru beep sonor =====
+def beep():
+    try:
+        if platform.system() == "Windows":
+            import winsound
+            winsound.Beep(1000, 300)
+        else:
+            os.system("printf '\\a'")
+    except Exception:
+        pass
+
+
+# ============================= QUIZ WINDOW =============================
 class QuizWindow(tk.Toplevel):
     def __init__(self, parent, domain, num_questions, mode, time_limit):
         super().__init__(parent)
         self.title("FEA Quiz - Sesiune Quiz")
-        self.geometry("550x640")
+        self.geometry("550x650")
         self.configure(bg="#111")
 
         self.domain = domain
@@ -37,22 +51,21 @@ class QuizWindow(tk.Toplevel):
         self.show_question()
 
     # --------------------------- UI Setup ---------------------------
-
     def create_widgets(self):
         self.lbl_title = tk.Label(self, text=f"Domeniu: {self.domain} | Mod: {self.mode.upper()}",
                                   font=("Segoe UI", 11, "bold"), fg="#00ffff", bg="#111")
         self.lbl_title.pack(pady=8)
 
         # Timer vizibil + bară progres
-        self.lbl_timer = tk.Label(self, text="", font=("Segoe UI", 10, "bold"), fg="#ffcc00", bg="#111")
+        self.lbl_timer = tk.Label(self, text="", font=("Segoe UI", 10, "bold"), fg="#00ff88", bg="#111")
         self.lbl_timer.pack(pady=3)
 
         self.progress_var = tk.DoubleVar(value=100)
-        self.progress_bar = ttk.Progressbar(self, orient="horizontal", length=300,
+        self.progress_bar = ttk.Progressbar(self, orient="horizontal", length=320,
                                             variable=self.progress_var, mode="determinate")
         self.progress_bar.pack(pady=5)
 
-        self.lbl_question = tk.Label(self, text="", wraplength=480, justify="left",
+        self.lbl_question = tk.Label(self, text="", wraplength=500, justify="left",
                                      font=("Segoe UI", 10), fg="white", bg="#111")
         self.lbl_question.pack(pady=20)
 
@@ -78,7 +91,6 @@ class QuizWindow(tk.Toplevel):
         self.btn_close.pack(pady=10)
 
     # --------------------------- Timer ---------------------------
-
     def start_timer(self):
         if self.mode != "exam" or self.time_limit <= 0:
             return
@@ -95,6 +107,11 @@ class QuizWindow(tk.Toplevel):
             percent = (self.remaining_time / self.time_limit) * 100
             self.progress_var.set(percent)
             self.update_timer_label()
+
+            # Beep când mai rămân 5 secunde
+            if self.remaining_time == 5:
+                beep()
+
         if self.remaining_time <= 0 and self.timer_running:
             self.timer_running = False
             self.after(100, lambda: self.submit_answer(timeout=True))
@@ -109,7 +126,6 @@ class QuizWindow(tk.Toplevel):
             self.lbl_timer.config(fg="#00ff88")
 
     # --------------------------- Logică întrebări ---------------------------
-
     def show_question(self):
         if self.current_index >= self.num_questions:
             self.show_result()
@@ -141,7 +157,7 @@ class QuizWindow(tk.Toplevel):
             if is_correct:
                 self.score += 1
 
-        # Feedback instant doar în modul TRAIN
+        # Feedback instant doar în TRAIN
         if self.mode == "train":
             if timeout:
                 self.lbl_feedback.config(text="⏰ Timp expirat!")
@@ -156,7 +172,6 @@ class QuizWindow(tk.Toplevel):
         self.after(1500 if self.mode == "train" else 500, self.show_question)
 
     # --------------------------- Rezultat final ---------------------------
-
     def show_result(self):
         self.timer_running = False
         pct = (self.score / self.num_questions) * 100 if self.num_questions > 0 else 0
@@ -182,15 +197,13 @@ class QuizWindow(tk.Toplevel):
         self.btn_submit.config(state="disabled")
 
 
-# ============================== Fereastra Principală ==============================
-
+# ============================= FEREASTRĂ PRINCIPALĂ =============================
 class FEAGui(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("FEA Quiz Trainer")
         self.geometry("950x700")
         self.configure(bg="#111")
-
         self.create_main_widgets()
 
     def create_main_widgets(self):
@@ -217,7 +230,7 @@ class FEAGui(tk.Tk):
         tk.Radiobutton(self, text="EXAM (limită timp, feedback la final)", variable=self.mode_var, value="exam",
                        bg="#111", fg="white", selectcolor="#222").pack()
 
-        # Timp per întrebare (doar EXAM)
+        # Timp per întrebare
         tk.Label(self, text="Timp per întrebare (secunde, doar EXAM):", font=("Segoe UI", 9, "bold"), fg="white", bg="#111").pack()
         self.time_var = tk.IntVar(value=15)
         tk.Spinbox(self, from_=5, to=120, textvariable=self.time_var, width=5).pack(pady=5)
@@ -226,7 +239,6 @@ class FEAGui(tk.Tk):
         tk.Button(self, text="Start Quiz", bg="#00bfff", fg="white", font=("Segoe UI", 11, "bold"),
                   command=self.start_quiz).pack(pady=10)
 
-        # Linie separator
         ttk.Separator(self, orient="horizontal").pack(fill="x", pady=10)
 
         # Secțiune rapoarte
@@ -242,7 +254,6 @@ class FEAGui(tk.Tk):
                   font=("Segoe UI", 10), command=self.run_stats).pack(pady=5)
 
     # --------------------------- Funcții principale ---------------------------
-
     def start_quiz(self):
         domain = self.domain_var.get()
         num = self.num_var.get()
