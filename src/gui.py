@@ -1,3 +1,5 @@
+import tkinter as tk
+from quiz_core import load_questions
 class QuizWindow(tk.Toplevel):
     """
     Versiunea 3:
