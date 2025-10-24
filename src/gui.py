@@ -5,7 +5,6 @@ import time
 import os
 import json
 import random
-import platform
 import winsound
 from PIL import Image, ImageTk, ImageFilter
 from stats import load_history, summarize_by_domain
@@ -15,11 +14,10 @@ from progress_chart import main as generate_chart
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 
-
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
 
 
-# =================== CONFIG ===================
+# ============ CONFIG ============
 def save_config(domain, num, mode, time_limit, theme):
     cfg = {"domain": domain, "num_questions": num, "mode": mode, "time_limit": time_limit, "theme": theme}
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
@@ -36,12 +34,14 @@ def load_config():
         return {"domain": "structural", "num_questions": 5, "mode": "train", "time_limit": 15, "theme": "dark"}
 
 
-# =================== SUNETE ===================
+# ============ SUNETE ============
 def sound_correct():
     winsound.Beep(1200, 150)
 
+
 def sound_wrong():
     winsound.Beep(400, 250)
+
 
 def sound_finish():
     winsound.Beep(800, 120)
@@ -49,7 +49,7 @@ def sound_finish():
     winsound.Beep(1500, 180)
 
 
-# =================== SPLASH SCREEN ===================
+# ============ SPLASH SCREEN ============
 class SplashScreen(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
@@ -66,7 +66,7 @@ class SplashScreen(tk.Toplevel):
         self.after(2000, self.destroy)
 
 
-# =================== QUIZ WINDOW ===================
+# ============ QUIZ WINDOW ============
 class QuizWindow(tk.Toplevel):
     def __init__(self, parent, domain, num_questions, mode, time_limit, theme_colors):
         super().__init__(parent)
@@ -86,7 +86,6 @@ class QuizWindow(tk.Toplevel):
 
         self.current = 0
         self.score = 0
-        self.results = []
         self.var_choice = tk.IntVar(value=-1)
         self.remaining_time = time_limit
         self.timer_running = False
@@ -125,6 +124,7 @@ class QuizWindow(tk.Toplevel):
 
     def make_hover_button(self, text, cmd):
         b = tk.Button(self, text=text, bg="#00bfff", fg="white", font=("Segoe UI", 10, "bold"), command=cmd)
+
         def on_enter(e): b.config(bg="#00ffff")
         def on_leave(e): b.config(bg="#00bfff")
         b.bind("<Enter>", on_enter)
@@ -198,7 +198,7 @@ class QuizWindow(tk.Toplevel):
         self.feedback.config(text="Felicitări! Completează mai multe teste pentru progres.")
 
 
-# =================== MAIN GUI ===================
+# ============ MAIN GUI ============
 class FEAGui(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -207,8 +207,10 @@ class FEAGui(tk.Tk):
         self.resizable(False, False)
         self.config_data = load_config()
         self.theme = self.load_theme()
-        self.make_background()
-        self.build_ui()
+
+        # FIX — creăm background după inițializare completă
+        self.after(50, self.make_background)
+        self.after(100, self.build_ui)
 
     def load_theme(self):
         if self.config_data.get("theme", "dark") == "light":
@@ -236,7 +238,7 @@ class FEAGui(tk.Tk):
 
         tk.Label(f, text="Domeniu:", bg=self.theme["bg"], fg=self.theme["text"]).pack()
         self.domain_var = tk.StringVar(value=self.config_data["domain"])
-        ttk.Combobox(f, textvariable=self.domain_var, values=["structural","crash","nvh","cfd","moldflow","mix"], width=40).pack(pady=5)
+        ttk.Combobox(f, textvariable=self.domain_var, values=["structural", "crash", "nvh", "cfd", "moldflow", "mix"], width=40).pack(pady=5)
 
         tk.Label(f, text="Număr întrebări:", bg=self.theme["bg"], fg=self.theme["text"]).pack()
         self.num_var = tk.IntVar(value=self.config_data["num_questions"])
