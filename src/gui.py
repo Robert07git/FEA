@@ -1,5 +1,28 @@
 import tkinter as tk
-from quiz_core import load_questions
+from tkinter import ttk, messagebox
+import subprocess
+import os
+
+# importăm logica noastră existentă
+from data_loader import load_questions
+from stats import show_dashboard  # pentru progres text
+
+# Căi utile
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROGRESS_IMG_PATH = os.path.join(BASE_DIR, "progress_chart.png")
+PDF_EXPORT_SCRIPT = os.path.join(BASE_DIR, "src", "export_pdf.py")
+CHART_SCRIPT = os.path.join(BASE_DIR, "src", "progress_chart.py")
+
+DOMENII_OPTIUNI = {
+    "Structural (tensiuni / mesh / BC)": "structural",
+    "Crash (impact / energie absorbită)": "crash",
+    "Moldflow (injecție plastic)": "moldflow",
+    "CFD (aerodinamică / curgere)": "cfd",
+    "NVH (zgomot / vibrații / confort)": "nvh",
+    "MIX (toate domeniile)": "mix",
+}
+
+
 class QuizWindow(tk.Toplevel):
     """
     Versiunea 3:
@@ -331,7 +354,6 @@ class QuizWindow(tk.Toplevel):
             })
 
         # în mod TRAIN: dăm feedback imediat
-        # în mod EXAM: dacă e răspuns manual, nu facem spoil; dacă timeout, zicem că a expirat
         if self.mode == "train":
             if corect:
                 fb = "Corect ✅\n"
@@ -429,6 +451,304 @@ class QuizWindow(tk.Toplevel):
         # Dezactivăm butonul Next
         self.btn_next.config(state="disabled")
 
-        # Actualizăm statusul ca să nu mai afișeze timp rămas
+        # Anulăm timer display
         self.time_left = None
         self.update_status_label()
+
+
+class MainWindow(tk.Tk):
+    """
+    Fereastra principală a aplicației GUI.
+    Te lasă să:
+    - alegi domeniu
+    - alegi nr. întrebări
+    - alegi TRAIN vs EXAM
+    - setezi timpul pe întrebare (în EXAM)
+    - rulezi quiz-ul (deschide QuizWindow)
+    - generezi PDF din ultimul EXAM
+    - generezi grafic de progres
+    - vezi progres text (stats)
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.title("FEA Quiz Trainer")
+        self.geometry("900x600")
+        self.configure(bg="#0F0F0F")
+
+        label_style = {"bg": "#0F0F0F", "fg": "#FFFFFF", "font": ("Segoe UI", 10, "bold")}
+        field_style = {
+            "bg": "#1F1F1F",
+            "fg": "#FFFFFF",
+            "insertbackground": "#FFFFFF",
+            "relief": "flat"
+        }
+
+        section_title = tk.Label(
+            self,
+            text="Setări sesiune",
+            bg="#0F0F0F",
+            fg="#00D4FF",
+            font=("Segoe UI", 12, "bold")
+        )
+        section_title.pack(pady=(20,10))
+
+        # Domeniu
+        tk.Label(self, text="Domeniu:", **label_style).pack(anchor="w", padx=30)
+        self.combo_domain = ttk.Combobox(
+            self,
+            values=list(DOMENII_OPTIUNI.keys()),
+            state="readonly"
+        )
+        self.combo_domain.current(0)
+        self.combo_domain.pack(padx=30, fill="x", pady=(0,10))
+
+        # Nr întrebări
+        tk.Label(self, text="Număr întrebări:", **label_style).pack(anchor="w", padx=30)
+        self.entry_numq = tk.Entry(self, **field_style)
+        self.entry_numq.insert(0, "5")
+        self.entry_numq.pack(padx=30, fill="x", pady=(0,10))
+
+        # Mod (TRAIN / EXAM)
+        tk.Label(self, text="Mod:", **label_style).pack(anchor="w", padx=30)
+        self.mode_var = tk.StringVar(value="train")
+        frame_modes = tk.Frame(self, bg="#0F0F0F")
+        frame_modes.pack(anchor="w", padx=30, pady=(0,10))
+
+        rb_train = tk.Radiobutton(
+            frame_modes,
+            text="TRAIN (fără limită timp, feedback imediat)",
+            variable=self.mode_var,
+            value="train",
+            bg="#0F0F0F",
+            fg="#FFFFFF",
+            activebackground="#0F0F0F",
+            activeforeground="#00D4FF",
+            selectcolor="#1F1F1F"
+        )
+        rb_train.pack(anchor="w")
+
+        rb_exam = tk.Radiobutton(
+            frame_modes,
+            text="EXAM (limită timp, review la final)",
+            variable=self.mode_var,
+            value="exam",
+            bg="#0F0F0F",
+            fg="#FFFFFF",
+            activebackground="#0F0F0F",
+            activeforeground="#00D4FF",
+            selectcolor="#1F1F1F"
+        )
+        rb_exam.pack(anchor="w")
+
+        # Timp per întrebare
+        tk.Label(
+            self,
+            text="Timp pe întrebare (secunde, doar EXAM):",
+            **label_style
+        ).pack(anchor="w", padx=30)
+        self.entry_time = tk.Entry(self, **field_style)
+        self.entry_time.insert(0, "15")
+        self.entry_time.pack(padx=30, fill="x", pady=(0,20))
+
+        # Buton Start Quiz
+        self.btn_start = tk.Button(
+            self,
+            text="Start Quiz",
+            command=self.start_quiz_clicked,
+            bg="#00D4FF",
+            fg="#000000",
+            activebackground="#00AACC",
+            activeforeground="#000000",
+            font=("Segoe UI", 11, "bold"),
+            relief="flat",
+            padx=16,
+            pady=10
+        )
+        self.btn_start.pack(padx=30, fill="x")
+
+        # Linie separatoare
+        tk.Label(
+            self,
+            text="Rapoarte & Analiză",
+            bg="#0F0F0F",
+            fg="#00D4FF",
+            font=("Segoe UI", 12, "bold")
+        ).pack(pady=(30,10))
+
+        # Buton generare grafic progres
+        self.btn_chart = tk.Button(
+            self,
+            text="Generează grafic progres (.png)",
+            command=self.generate_chart,
+            bg="#333333",
+            fg="#FFFFFF",
+            activebackground="#444444",
+            activeforeground="#FFFFFF",
+            relief="flat",
+            padx=16,
+            pady=10
+        )
+        self.btn_chart.pack(padx=30, fill="x", pady=(0,10))
+
+        # Buton export PDF
+        self.btn_pdf = tk.Button(
+            self,
+            text="Generează PDF din ultimul EXAM",
+            command=self.generate_pdf,
+            bg="#333333",
+            fg="#FFFFFF",
+            activebackground="#444444",
+            activeforeground="#FFFFFF",
+            relief="flat",
+            padx=16,
+            pady=10
+        )
+        self.btn_pdf.pack(padx=30, fill="x", pady=(0,10))
+
+        # Buton progres text (stats)
+        self.btn_stats = tk.Button(
+            self,
+            text="Arată progres text (stats)",
+            command=self.show_stats_popup,
+            bg="#333333",
+            fg="#FFFFFF",
+            activebackground="#444444",
+            activeforeground="#FFFFFF",
+            relief="flat",
+            padx=16,
+            pady=10
+        )
+        self.btn_stats.pack(padx=30, fill="x", pady=(0,30))
+
+        # Footer
+        tk.Label(
+            self,
+            text="FEA Quiz Trainer v1 GUI",
+            bg="#0F0F0F",
+            fg="#777777",
+            font=("Segoe UI", 8)
+        ).pack(side="bottom", pady=10)
+
+    def start_quiz_clicked(self):
+        # citim opțiunile din UI
+        domeniu_ui = self.combo_domain.get()
+        domeniu_real = DOMENII_OPTIUNI.get(domeniu_ui, "mix")
+
+        try:
+            num_q = int(self.entry_numq.get().strip())
+        except ValueError:
+            messagebox.showerror("Eroare", "Număr întrebări invalid.")
+            return
+
+        mode = self.mode_var.get().strip()
+        if mode not in ("train", "exam"):
+            messagebox.showerror("Eroare", "Mod invalid.")
+            return
+
+        if mode == "exam":
+            try:
+                tsec = int(self.entry_time.get().strip())
+                if tsec < 3:
+                    messagebox.showerror("Eroare", "Timp prea mic (<3s).")
+                    return
+                if tsec > 120:
+                    messagebox.showerror("Eroare", "Timp prea mare (>120s).")
+                    return
+            except ValueError:
+                messagebox.showerror("Eroare", "Timpul per întrebare trebuie să fie număr.")
+                return
+        else:
+            tsec = None
+
+        # deschidem o fereastră nouă care rulează quiz-ul în GUI
+        QuizWindow(
+            master=self,
+            domeniu=domeniu_real,
+            num_intrebari=num_q,
+            mode=mode,
+            time_limit_sec=tsec
+        )
+
+    def generate_chart(self):
+        # rulăm progress_chart.py ca script separat
+        try:
+            result = subprocess.run(
+                ["python", CHART_SCRIPT],
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace"
+            )
+            # după generare, verificăm dacă există imaginea
+            if os.path.exists(PROGRESS_IMG_PATH):
+                messagebox.showinfo(
+                    "Grafic generat",
+                    f"Graficul a fost salvat ca:\n{PROGRESS_IMG_PATH}\n\nPoți deschide PNG-ul să vezi trendul scorurilor tale."
+                )
+            else:
+                messagebox.showwarning(
+                    "Atenție",
+                    "Scriptul a rulat, dar nu am găsit progress_chart.png."
+                )
+        except subprocess.CalledProcessError as e:
+            messagebox.showerror("Eroare la grafic", e.stderr or str(e))
+
+    def generate_pdf(self):
+        # rulăm export_pdf.py ca script separat
+        try:
+            result = subprocess.run(
+                ["python", PDF_EXPORT_SCRIPT],
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace"
+            )
+            # outputul scriptului îl punem într-un popup
+            messagebox.showinfo("Export PDF", result.stdout.strip())
+        except subprocess.CalledProcessError as e:
+            messagebox.showerror("Eroare la PDF", e.stderr or str(e))
+
+    def show_stats_popup(self):
+        # capturăm outputul din show_dashboard() într-un popup
+        import io
+        import sys
+        buf = io.StringIO()
+        old_stdout = sys.stdout
+        sys.stdout = buf
+        try:
+            show_dashboard()
+        except Exception as e:
+            buf.write(f"Eroare la stats: {e}")
+        finally:
+            sys.stdout = old_stdout
+
+        content = buf.getvalue()
+
+        win = tk.Toplevel(self)
+        win.title("Progres personal (stats)")
+        win.geometry("480x320")
+        win.configure(bg="#111111")
+
+        txt = tk.Text(
+            win,
+            bg="#1F1F1F",
+            fg="#FFFFFF",
+            insertbackground="#FFFFFF",
+            wrap="word",
+            relief="flat"
+        )
+        txt.pack(fill="both", expand=True, padx=10, pady=10)
+        txt.insert("1.0", content)
+        txt.config(state="disabled")
+
+
+def main():
+    app = MainWindow()
+    app.mainloop()
+
+
+if __name__ == "__main__":
+    main()
