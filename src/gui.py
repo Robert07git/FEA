@@ -1,330 +1,182 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+import threading
+import time
 import subprocess
-import os
-
-# importăm logica noastră existentă
-from data_loader import load_questions
-from stats import show_dashboard  # pentru progres text
-
-# Căi utile
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PROGRESS_IMG_PATH = os.path.join(BASE_DIR, "progress_chart.png")
-PDF_EXPORT_SCRIPT = os.path.join(BASE_DIR, "src", "export_pdf.py")
-CHART_SCRIPT = os.path.join(BASE_DIR, "src", "progress_chart.py")
-
-DOMENII_OPTIUNI = {
-    "Structural (tensiuni / mesh / BC)": "structural",
-    "Crash (impact / energie absorbită)": "crash",
-    "Moldflow (injecție plastic)": "moldflow",
-    "CFD (aerodinamică / curgere)": "cfd",
-    "NVH (zgomot / vibrații / confort)": "nvh",
-    "MIX (toate domeniile)": "mix",
-}
+from quiz_core import load_questions
+import random
 
 
 class QuizWindow(tk.Toplevel):
-    """
-    Versiunea 3:
-    - Quiz-ul rulează 100% în GUI (TRAIN și EXAM)
-    - EXAM are acum timer vizual pe întrebare
-      * dacă timpul expiră -> marchează ca nereușită și trece mai departe
-    """
-
-    def __init__(self, master, domeniu, num_intrebari, mode, time_limit_sec):
+    def __init__(self, master, domeniu, mode, num_questions, time_per_q):
         super().__init__(master)
         self.title("FEA Quiz - Sesiune Quiz")
-        self.geometry("520x560")
-        self.configure(bg="#111111")
+        self.geometry("520x580")
+        self.configure(bg="#0d0d0d")
+        self.resizable(False, False)
 
         self.domeniu = domeniu
-        self.num_intrebari = num_intrebari
-        self.mode = mode       # "train" sau "exam"
-        self.time_limit_sec = time_limit_sec  # număr de secunde / întrebare (doar EXAM)
+        self.mode = mode
+        self.num_questions = num_questions
+        self.time_per_q = time_per_q
+        self.questions = random.sample(load_questions(domeniu), num_questions)
+        self.current_index = 0
+        self.correct_count = 0
+        self.asked_count = 0
+        self.timer_thread = None
+        self.timer_running = False
+        self.time_left = self.time_per_q
+        self.gresite = []
 
-        # ======================
-        # 1. Încărcăm întrebările
-        # ======================
-        all_q = load_questions(domain=self.domeniu)
-        if len(all_q) == 0:
-            # fallback la mix dacă domeniul e gol
-            all_q = load_questions(domain="mix")
-
-        # selectăm doar câte au cerut
-        # (pentru versiunea asta luăm primele N. În viitor putem randomiza.)
-        self.questions = all_q[: self.num_intrebari]
-
-        # ======================
-        # 2. State-ul sesiunii
-        # ======================
-        self.current_index = 0          # întrebarea curentă (0-based)
-        self.correct_count = 0          # câte corecte
-        self.asked_count = 0            # câte întrebări am pus deja
-        self.gresite = []               # întrebări greșite pt revizuire la sfârșit
-        self.time_left = None           # secunde rămase pentru întrebarea curentă
-        self.timer_running = False      # ca să nu rulăm 2 countdown-uri simultan
-
-        # ======================
-        # 3. UI ELEMENTS
-        # ======================
-
-        # Header cu domeniu / mod
-        self.lbl_header = tk.Label(
+        # Titlu domeniu + mod
+        self.lbl_title = tk.Label(
             self,
-            text=f"Domeniu: {self.domeniu} | Mod: {self.mode.upper()}",
-            fg="#00D4FF",
-            bg="#111111",
-            font=("Segoe UI", 10, "bold"),
-            wraplength=480,
-            justify="left"
+            text=f"Domeniu: {domeniu} | Mod: {mode.upper()}",
+            bg="#0d0d0d",
+            fg="#00bfff",
+            font=("Segoe UI", 11, "bold")
         )
-        self.lbl_header.pack(pady=(15,5))
+        self.lbl_title.pack(pady=10)
 
-        # Sub-header cu progres și timer
-        # ex: "Întrebarea 2 / 5     |     Timp rămas: 13s"
-        self.lbl_status = tk.Label(
-            self,
-            text="",
-            fg="#FFFFFF",
-            bg="#111111",
-            font=("Segoe UI", 9, "bold"),
-            wraplength=480,
-            justify="left"
+        # Numărul întrebării curente
+        self.lbl_qcount = tk.Label(
+            self, text="", bg="#0d0d0d", fg="white", font=("Segoe UI", 10)
         )
-        self.lbl_status.pack(pady=(0,10))
+        self.lbl_qcount.pack(pady=(0, 5))
 
-        # Întrebarea efectivă
+        # Text întrebare
         self.lbl_question = tk.Label(
             self,
-            text="Întrebare aici...",
-            fg="#FFFFFF",
-            bg="#111111",
-            font=("Segoe UI", 10, "bold"),
-            wraplength=480,
-            justify="left"
+            text="",
+            wraplength=470,
+            justify="left",
+            bg="#0d0d0d",
+            fg="white",
+            font=("Segoe UI", 10)
         )
-        self.lbl_question.pack(pady=(10,5))
+        self.lbl_question.pack(pady=10)
 
-        # Răspunsuri (radio buttons)
-        self.answer_var = tk.IntVar(value=-1)
-        self.frame_choices = tk.Frame(self, bg="#111111")
-        self.frame_choices.pack(pady=(5,10), fill="x")
-
-        self.choice_buttons = []
+        # Opțiuni (radiobuttons)
+        self.answer_var = tk.IntVar()
+        self.options = []
         for i in range(4):
             rb = tk.Radiobutton(
-                self.frame_choices,
-                text=f"Varianta {i+1}",
+                self,
+                text="",
                 variable=self.answer_var,
                 value=i,
-                bg="#111111",
-                fg="#FFFFFF",
-                activebackground="#111111",
-                activeforeground="#00D4FF",
-                selectcolor="#1F1F1F",
-                wraplength=460,
-                justify="left",
-                anchor="w"
+                bg="#0d0d0d",
+                fg="white",
+                font=("Segoe UI", 9),
+                anchor="w",
+                selectcolor="#1a1a1a",
+                activebackground="#0d0d0d",
+                activeforeground="#00bfff"
             )
-            rb.pack(anchor="w", pady=2)
-            self.choice_buttons.append(rb)
+            rb.pack(fill="x", padx=40, pady=3)
+            self.options.append(rb)
 
-        # Feedback în TRAIN (sau mesaj de confirmare în EXAM)
+        # Feedback label
         self.lbl_feedback = tk.Label(
             self,
             text="",
-            fg="#AAAAAA",
-            bg="#111111",
-            font=("Segoe UI", 9),
-            wraplength=480,
-            justify="left"
+            wraplength=470,
+            justify="left",
+            bg="#0d0d0d",
+            fg="#00ffcc",
+            font=("Segoe UI", 9, "italic")
         )
-        self.lbl_feedback.pack(pady=(5,10))
+        self.lbl_feedback.pack(pady=(8, 10))
 
         # Buton principal
         self.btn_next = tk.Button(
             self,
-            text="Răspunde / Următoarea",
-            command=self.on_submit_answer_manual,
-            bg="#00D4FF",
-            fg="#000000",
-            activebackground="#00AACC",
-            activeforeground="#000000",
+            text="Răspunde / Finalizează",
+            command=self.submit_and_advance,
+            bg="#00bfff",
+            fg="black",
+            font=("Segoe UI", 10, "bold"),
+            activebackground="#00e6e6",
+            activeforeground="black",
             relief="flat",
-            padx=12,
-            pady=8,
-            font=("Segoe UI", 10, "bold")
+            width=30
         )
-        self.btn_next.pack(pady=(10,10))
+        self.btn_next.pack(pady=10)
 
-        # Buton de închidere final
+        # Timer (EXAM)
+        self.lbl_timer = tk.Label(
+            self,
+            text="",
+            bg="#0d0d0d",
+            fg="#ff6666",
+            font=("Consolas", 10, "bold")
+        )
+        self.lbl_timer.pack(pady=(5, 5))
+
+        # Buton închidere
         self.btn_close = tk.Button(
             self,
             text="Închide",
             command=self.destroy,
             bg="#333333",
-            fg="#FFFFFF",
-            activebackground="#444444",
-            activeforeground="#FFFFFF",
+            fg="white",
+            font=("Segoe UI", 9),
             relief="flat",
-            padx=12,
-            pady=8
+            width=10
         )
-        self.btn_close.pack(pady=(0,20))
+        self.btn_close.pack(pady=(5, 10))
 
-        # 4. Pornim cu prima întrebare
+        # Pornim prima întrebare
         self.show_current_question(start_new=True)
 
-    # ============================================================
-    # Helper intern: actualizează labelul de status (progres + timp)
-    # ============================================================
-    def update_status_label(self):
-        # exemplu:
-        # "Întrebarea 2 / 5   |   Timp rămas: 13s"
-        total = len(self.questions)
-        cur = min(self.current_index + 1, total)
-
-        if self.mode == "exam" and self.time_left is not None:
-            status_text = f"Întrebarea {cur}/{total}   |   Timp rămas: {self.time_left}s"
-        else:
-            status_text = f"Întrebarea {cur}/{total}"
-
-        self.lbl_status.config(text=status_text)
-
-    # ============================================================
-    # Timer logic: pornește / scade / oprește
-    # ============================================================
-    def start_timer_for_question(self):
-        """
-        Pornește timerul doar dacă suntem în EXAM și avem time_limit_sec.
-        """
-        if self.mode != "exam":
-            self.time_left = None
-            self.timer_running = False
-            self.update_status_label()
-            return
-
-        if self.time_limit_sec is None:
-            # nu avem timp limită setat
-            self.time_left = None
-            self.timer_running = False
-            self.update_status_label()
-            return
-
-        # pornim countdown
-        self.time_left = int(self.time_limit_sec)
-        self.timer_running = True
-        self.update_status_label()
-        self.after(1000, self.tick_timer)
-
-    def tick_timer(self):
-        """
-        Scade timpul cu 1s și actualizează UI.
-        Dacă ajunge la 0, marchează întrebarea ca ratată și trece mai departe.
-        """
-        if not self.timer_running:
-            return
-
-        if self.time_left is None:
-            return
-
-        self.time_left -= 1
-
-        if self.time_left <= 0:
-            # timp expirat -> întrebarea e considerată greșită
-            self.time_left = 0
-            self.update_status_label()
-            # simulăm un răspuns "nimic selectat"
-            self.auto_submit_timeout()
-            return
-
-        # altfel, încă mai avem timp
-        self.update_status_label()
-        self.after(1000, self.tick_timer)
-
-    def stop_timer(self):
-        """Oprim timerul ca să nu mai facă tick între întrebări."""
-        self.timer_running = False
-
-    # ============================================================
-    # Afișarea întrebării curente
-    # ============================================================
+    # ===============================
+    # LOGICA PRINCIPALĂ QUIZ
+    # ===============================
     def show_current_question(self, start_new=False):
-        """
-        Afișează întrebarea curentă și opțiunile.
-        Dacă am terminat, apelăm end_quiz().
-        """
         if self.current_index >= len(self.questions):
             self.end_quiz()
             return
 
         qdata = self.questions[self.current_index]
-        q_text = qdata["question"]
-        choices = qdata["choices"]
-
-        # întrebare
-        self.lbl_question.config(
-            text=f"Q{self.current_index+1}: {q_text}"
+        self.lbl_qcount.config(
+            text=f"Întrebarea {self.current_index + 1}/{self.num_questions}"
         )
-
-        # resetăm selecția utilizatorului
+        self.lbl_question.config(text=qdata["question"])
         self.answer_var.set(-1)
 
-        # reactivăm butoanele cu opțiuni
-        for i, rb in enumerate(self.choice_buttons):
-            if i < len(choices):
-                rb.config(text=f"{i+1}. {choices[i]}", state="normal")
-            else:
-                rb.config(text=f"{i+1}. -", state="disabled")
+        for i, opt in enumerate(qdata["choices"]):
+            self.options[i].config(text=f"{i + 1}. {opt}")
 
-        # ștergem feedback vechi
         self.lbl_feedback.config(text="")
 
-        # setăm textul butonului principal
-        if self.current_index == len(self.questions) - 1:
-            self.btn_next.config(text="Răspunde / Finalizează")
-        else:
-            self.btn_next.config(text="Răspunde / Următoarea")
+        if self.mode == "exam" and start_new:
+            self.time_left = self.time_per_q
+            self.start_timer()
 
-        # Pornește timerul pentru această întrebare dacă e cazul
-        self.start_timer_for_question()
+    def start_timer(self):
+        self.timer_running = True
 
-        # actualizăm statusul (întrebare / total / timp)
-        self.update_status_label()
+        def run_timer():
+            while self.time_left > 0 and self.timer_running:
+                self.lbl_timer.config(text=f"Timp rămas: {self.time_left}s")
+                time.sleep(1)
+                self.time_left -= 1
+            if self.timer_running and self.time_left <= 0:
+                self.lbl_timer.config(text="Timp expirat ⏱️")
+                self.submit_and_advance(timeout=True)
 
-    # ============================================================
-    # Când userul apasă butonul Next manual
-    # ============================================================
-    def on_submit_answer_manual(self):
-        """
-        User a ales ceva și a dat click pe 'Răspunde / Următoarea'.
-        Asta e varianta normală.
-        """
-        self.submit_and_advance(timeout=False)
+        self.timer_thread = threading.Thread(target=run_timer, daemon=True)
+        self.timer_thread.start()
 
-    # ============================================================
-    # Când timpul expiră (timeout)
-    # ============================================================
-    def auto_submit_timeout(self):
-        """
-        Dacă timpul a expirat, considerăm că nu a răspuns
-        => answer_var rămâne -1
-        => întrebarea se contorizează ca greșită.
-        """
-        self.submit_and_advance(timeout=True)
+    def stop_timer(self):
+        self.timer_running = False
 
-    # ============================================================
-    # Logica comună de evaluare întrebare
-    # ============================================================
+    # ===============================
+    # NOUA VARIANTĂ - FEEDBACK ÎN TRAIN
+    # ===============================
     def submit_and_advance(self, timeout=False):
-        """
-        Marchează întrebarea curentă ca răspunsă și trece mai departe.
-        timeout=True înseamnă că userul NU a apucat să răspundă în timp.
-        """
-        # Oprim timerul pentru întrebarea actuală
         self.stop_timer()
 
-        # Verificăm întâi dacă încă avem întrebare validă
         if self.current_index >= len(self.questions):
             self.end_quiz()
             return
@@ -335,16 +187,14 @@ class QuizWindow(tk.Toplevel):
         domeniu_q = qdata.get("domain", self.domeniu)
 
         selected = self.answer_var.get()
-        # Contorizăm că această întrebare a fost pusă
         self.asked_count += 1
 
         corect = (selected == correct_idx)
         if corect:
             self.correct_count += 1
         else:
-            # salvăm pentru revizuire/raport EXAM
             self.gresite.append({
-                "idx": self.current_index+1,
+                "idx": self.current_index + 1,
                 "domain": domeniu_q,
                 "question": qdata["question"],
                 "choices": qdata["choices"],
@@ -353,402 +203,238 @@ class QuizWindow(tk.Toplevel):
                 "timeout": timeout
             })
 
-        # în mod TRAIN: dăm feedback imediat
+        # -----------------------------
+        # FEEDBACK IMEDIAT (TRAIN)
+        # -----------------------------
         if self.mode == "train":
             if corect:
-                fb = "Corect ✅\n"
+                fb = "✅ Corect!\n"
             else:
                 if timeout:
-                    fb = "Timp expirat ❌\n"
+                    fb = "⏱️ Timp expirat.\n"
                 else:
-                    fb = "Greșit ❌\n"
+                    fb = "❌ Greșit.\n"
                 fb += (
-                    f"Răspuns corect: {correct_idx+1}. "
+                    f"Răspuns corect: {correct_idx + 1}. "
                     f"{qdata['choices'][correct_idx]}\n"
                 )
             fb += f"Explicație: {explanation}"
             self.lbl_feedback.config(text=fb)
 
-        else:  # exam
+            self.btn_next.config(
+                text="Următoarea întrebare ▶️",
+                command=self.next_after_feedback
+            )
+            return
+
+        # -----------------------------
+        # EXAM - doar înregistrează
+        # -----------------------------
+        if self.mode == "exam":
             if timeout:
-                self.lbl_feedback.config(text="Timp expirat ❌ Răspuns înregistrat.")
+                self.lbl_feedback.config(text="Timp expirat ❌")
             else:
-                self.lbl_feedback.config(text="Răspuns înregistrat.")
+                self.lbl_feedback.config(text="Răspuns înregistrat ✅")
 
-        # Trecem mai departe
         self.current_index += 1
-
-        # Dacă nu mai sunt întrebări => scor final
         if self.current_index >= len(self.questions):
             self.end_quiz()
         else:
-            # arătăm următoarea întrebare
             self.show_current_question(start_new=True)
 
-    # ============================================================
-    # Final de quiz
-    # ============================================================
+    def next_after_feedback(self):
+        """Afișează următoarea întrebare după feedback (TRAIN mode)."""
+        self.current_index += 1
+        if self.current_index >= len(self.questions):
+            self.end_quiz()
+        else:
+            self.show_current_question(start_new=True)
+
+    # ===============================
+    # FINAL QUIZ
+    # ===============================
     def end_quiz(self):
-        """
-        Afișăm scorul final + revizuire (dacă e EXAM).
-        Dezactivăm opțiunile și butonul 'Răspunde'.
-        """
-        # Siguranță: oprim orice timer activ
         self.stop_timer()
+        percent = (self.correct_count / self.num_questions) * 100
+        msg = (
+            f"=== REZULTAT FINAL ===\n"
+            f"Scor: {self.correct_count}/{self.num_questions}\n"
+            f"Procent: {percent:.1f}%\n"
+            f"Mod: {self.mode.upper()}\n\n"
+            "Nu-i panică. Reia teoria de bază. Asta se învață 💪\n"
+        )
 
-        if self.asked_count == 0:
-            pct = 0.0
-        else:
-            pct = (self.correct_count / self.asked_count) * 100.0
-
-        # Mesaj calitativ
-        if pct >= 80:
-            feedback = "Bravo, ești pe drumul bun pentru un interviu CAE junior 👌"
-        elif pct >= 50:
-            feedback = "E ok, dar mai lucrează la conceptele mai slabe din domeniul ales."
-        else:
-            feedback = "Nu-i panică. Reia teoria de bază. Asta se învață 💪"
-
-        summary_lines = []
-        summary_lines.append("=== REZULTAT FINAL ===")
-        summary_lines.append(f"Scor: {self.correct_count}/{self.asked_count}")
-        summary_lines.append(f"Procent: {pct:.1f}%")
-        summary_lines.append(f"Mod: {self.mode.upper()}")
-        summary_lines.append("")
-        summary_lines.append(feedback)
-
-        # EXAM: listăm întrebările care trebuie revizuite
+        # REVIEW doar pentru EXAM
         if self.mode == "exam" and self.gresite:
-            summary_lines.append("")
-            summary_lines.append("Întrebări pentru revizuit:")
-            for r in self.gresite:
-                good = r["choices"][r["correct_index"]]
-                # marcăm dacă a fost timeout
-                if r.get("timeout"):
-                    timeout_note = " (timp expirat)"
-                else:
-                    timeout_note = ""
-
-                summary_lines.append(
-                    f"- Q{r['idx']} ({r['domain']}){timeout_note} -> {r['question']}"
+            msg += "\nÎntrebări pentru revizuit:\n"
+            for q in self.gresite:
+                msg += (
+                    f"\n- Q{q['idx']} ({q['domain']})"
+                    f"{' (timp expirat)' if q['timeout'] else ''}"
+                    f" -> {q['question']}\n"
+                    f"  Răspuns corect: {q['choices'][q['correct_index']]}\n"
+                    f"  Explicație: {q['explanation']}\n"
                 )
-                summary_lines.append(f"  Răspuns corect: {good}")
-                summary_lines.append(f"  Explicație: {r['explanation']}")
-                summary_lines.append("")
 
-        final_text = "\n".join(summary_lines)
-
-        # Punem rezultatul final în zona de întrebare
-        self.lbl_question.config(text=final_text)
-
-        # Dezactivăm opțiunile de răspuns
-        for rb in self.choice_buttons:
-            rb.config(state="disabled")
-
-        # Curățăm feedback pentru final (sau îl poți lăsa gol)
+        self.lbl_question.config(text=msg)
+        for rb in self.options:
+            rb.pack_forget()
         self.lbl_feedback.config(text="")
-
-        # Dezactivăm butonul Next
-        self.btn_next.config(state="disabled")
-
-        # Anulăm timer display
-        self.time_left = None
-        self.update_status_label()
+        self.lbl_timer.config(text="")
+        self.btn_next.pack_forget()
 
 
-class MainWindow(tk.Tk):
-    """
-    Fereastra principală a aplicației GUI.
-    Te lasă să:
-    - alegi domeniu
-    - alegi nr. întrebări
-    - alegi TRAIN vs EXAM
-    - setezi timpul pe întrebare (în EXAM)
-    - rulezi quiz-ul (deschide QuizWindow)
-    - generezi PDF din ultimul EXAM
-    - generezi grafic de progres
-    - vezi progres text (stats)
-    """
-
+# ===============================
+# FEREASTRA PRINCIPALĂ
+# ===============================
+class MainApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("FEA Quiz Trainer")
-        self.geometry("900x600")
-        self.configure(bg="#0F0F0F")
+        self.geometry("1000x500")
+        self.configure(bg="#0d0d0d")
+        self.resizable(False, False)
 
-        label_style = {"bg": "#0F0F0F", "fg": "#FFFFFF", "font": ("Segoe UI", 10, "bold")}
-        field_style = {
-            "bg": "#1F1F1F",
-            "fg": "#FFFFFF",
-            "insertbackground": "#FFFFFF",
-            "relief": "flat"
-        }
-
-        section_title = tk.Label(
+        # Titlu
+        lbl_header = tk.Label(
             self,
             text="Setări sesiune",
-            bg="#0F0F0F",
-            fg="#00D4FF",
+            bg="#0d0d0d",
+            fg="#00bfff",
             font=("Segoe UI", 12, "bold")
         )
-        section_title.pack(pady=(20,10))
+        lbl_header.pack(pady=10)
 
         # Domeniu
-        tk.Label(self, text="Domeniu:", **label_style).pack(anchor="w", padx=30)
-        self.combo_domain = ttk.Combobox(
+        lbl_d = tk.Label(self, text="Domeniu:", bg="#0d0d0d", fg="white", anchor="w")
+        lbl_d.pack(fill="x", padx=25)
+        self.cmb_domain = ttk.Combobox(
             self,
-            values=list(DOMENII_OPTIUNI.keys()),
-            state="readonly"
+            values=[
+                "Structural (tensiuni / mesh / BC)",
+                "Crash / Impact",
+                "Moldflow",
+                "CFD",
+                "NVH",
+                "MIX (toate domeniile)"
+            ],
+            state="readonly",
+            font=("Segoe UI", 9)
         )
-        self.combo_domain.current(0)
-        self.combo_domain.pack(padx=30, fill="x", pady=(0,10))
+        self.cmb_domain.current(0)
+        self.cmb_domain.pack(fill="x", padx=25, pady=(0, 10))
 
-        # Nr întrebări
-        tk.Label(self, text="Număr întrebări:", **label_style).pack(anchor="w", padx=30)
-        self.entry_numq = tk.Entry(self, **field_style)
-        self.entry_numq.insert(0, "5")
-        self.entry_numq.pack(padx=30, fill="x", pady=(0,10))
+        # Număr întrebări
+        lbl_q = tk.Label(
+            self, text="Număr întrebări:", bg="#0d0d0d", fg="white", anchor="w"
+        )
+        lbl_q.pack(fill="x", padx=25)
+        self.spn_num = tk.Spinbox(self, from_=1, to=20, width=5)
+        self.spn_num.pack(padx=25, pady=(0, 10), anchor="w")
 
-        # Mod (TRAIN / EXAM)
-        tk.Label(self, text="Mod:", **label_style).pack(anchor="w", padx=30)
+        # Mod
+        lbl_mode = tk.Label(self, text="Mod:", bg="#0d0d0d", fg="white", anchor="w")
+        lbl_mode.pack(fill="x", padx=25)
         self.mode_var = tk.StringVar(value="train")
-        frame_modes = tk.Frame(self, bg="#0F0F0F")
-        frame_modes.pack(anchor="w", padx=30, pady=(0,10))
-
-        rb_train = tk.Radiobutton(
-            frame_modes,
+        tk.Radiobutton(
+            self,
             text="TRAIN (fără limită timp, feedback imediat)",
             variable=self.mode_var,
             value="train",
-            bg="#0F0F0F",
-            fg="#FFFFFF",
-            activebackground="#0F0F0F",
-            activeforeground="#00D4FF",
-            selectcolor="#1F1F1F"
-        )
-        rb_train.pack(anchor="w")
-
-        rb_exam = tk.Radiobutton(
-            frame_modes,
+            bg="#0d0d0d",
+            fg="white",
+            selectcolor="#1a1a1a"
+        ).pack(anchor="w", padx=25)
+        tk.Radiobutton(
+            self,
             text="EXAM (limită timp, review la final)",
             variable=self.mode_var,
             value="exam",
-            bg="#0F0F0F",
-            fg="#FFFFFF",
-            activebackground="#0F0F0F",
-            activeforeground="#00D4FF",
-            selectcolor="#1F1F1F"
-        )
-        rb_exam.pack(anchor="w")
+            bg="#0d0d0d",
+            fg="white",
+            selectcolor="#1a1a1a"
+        ).pack(anchor="w", padx=25, pady=(0, 10))
 
-        # Timp per întrebare
-        tk.Label(
+        # Timp întrebare
+        lbl_time = tk.Label(
             self,
             text="Timp pe întrebare (secunde, doar EXAM):",
-            **label_style
-        ).pack(anchor="w", padx=30)
-        self.entry_time = tk.Entry(self, **field_style)
-        self.entry_time.insert(0, "15")
-        self.entry_time.pack(padx=30, fill="x", pady=(0,20))
+            bg="#0d0d0d",
+            fg="white",
+            anchor="w"
+        )
+        lbl_time.pack(fill="x", padx=25)
+        self.spn_time = tk.Spinbox(self, from_=5, to=60, width=5)
+        self.spn_time.pack(padx=25, pady=(0, 15), anchor="w")
 
-        # Buton Start Quiz
-        self.btn_start = tk.Button(
+        # Buton START
+        btn_start = tk.Button(
             self,
             text="Start Quiz",
-            command=self.start_quiz_clicked,
-            bg="#00D4FF",
-            fg="#000000",
-            activebackground="#00AACC",
-            activeforeground="#000000",
-            font=("Segoe UI", 11, "bold"),
+            command=self.start_quiz,
+            bg="#00bfff",
+            fg="black",
+            font=("Segoe UI", 10, "bold"),
             relief="flat",
-            padx=16,
-            pady=10
+            width=50
         )
-        self.btn_start.pack(padx=30, fill="x")
+        btn_start.pack(pady=(0, 20))
 
-        # Linie separatoare
-        tk.Label(
+        # Secțiune rapoarte
+        lbl_reports = tk.Label(
             self,
             text="Rapoarte & Analiză",
-            bg="#0F0F0F",
-            fg="#00D4FF",
-            font=("Segoe UI", 12, "bold")
-        ).pack(pady=(30,10))
+            bg="#0d0d0d",
+            fg="#00bfff",
+            font=("Segoe UI", 10, "bold")
+        )
+        lbl_reports.pack(pady=5)
 
-        # Buton generare grafic progres
-        self.btn_chart = tk.Button(
+        self.make_button("Generează grafic progres (.png)", self.run_chart)
+        self.make_button("Generează PDF din ultimul EXAM", self.run_pdf)
+        self.make_button("Arată progres text (stats)", self.run_stats)
+
+    def make_button(self, text, cmd):
+        tk.Button(
             self,
-            text="Generează grafic progres (.png)",
-            command=self.generate_chart,
+            text=text,
+            command=cmd,
             bg="#333333",
-            fg="#FFFFFF",
-            activebackground="#444444",
-            activeforeground="#FFFFFF",
+            fg="white",
+            font=("Segoe UI", 9),
             relief="flat",
-            padx=16,
-            pady=10
-        )
-        self.btn_chart.pack(padx=30, fill="x", pady=(0,10))
+            width=50
+        ).pack(pady=5)
 
-        # Buton export PDF
-        self.btn_pdf = tk.Button(
-            self,
-            text="Generează PDF din ultimul EXAM",
-            command=self.generate_pdf,
-            bg="#333333",
-            fg="#FFFFFF",
-            activebackground="#444444",
-            activeforeground="#FFFFFF",
-            relief="flat",
-            padx=16,
-            pady=10
-        )
-        self.btn_pdf.pack(padx=30, fill="x", pady=(0,10))
+    # ===============================
+    # BUTOANE SECȚIUNE PRINCIPALĂ
+    # ===============================
+    def start_quiz(self):
+        domeniu = self.cmb_domain.get().split()[0].lower()
+        mode = self.mode_var.get()
+        num_q = int(self.spn_num.get())
+        time_q = int(self.spn_time.get())
+        QuizWindow(self, domeniu, mode, num_q, time_q)
 
-        # Buton progres text (stats)
-        self.btn_stats = tk.Button(
-            self,
-            text="Arată progres text (stats)",
-            command=self.show_stats_popup,
-            bg="#333333",
-            fg="#FFFFFF",
-            activebackground="#444444",
-            activeforeground="#FFFFFF",
-            relief="flat",
-            padx=16,
-            pady=10
-        )
-        self.btn_stats.pack(padx=30, fill="x", pady=(0,30))
-
-        # Footer
-        tk.Label(
-            self,
-            text="FEA Quiz Trainer v1 GUI",
-            bg="#0F0F0F",
-            fg="#777777",
-            font=("Segoe UI", 8)
-        ).pack(side="bottom", pady=10)
-
-    def start_quiz_clicked(self):
-        # citim opțiunile din UI
-        domeniu_ui = self.combo_domain.get()
-        domeniu_real = DOMENII_OPTIUNI.get(domeniu_ui, "mix")
-
+    def run_chart(self):
         try:
-            num_q = int(self.entry_numq.get().strip())
-        except ValueError:
-            messagebox.showerror("Eroare", "Număr întrebări invalid.")
-            return
-
-        mode = self.mode_var.get().strip()
-        if mode not in ("train", "exam"):
-            messagebox.showerror("Eroare", "Mod invalid.")
-            return
-
-        if mode == "exam":
-            try:
-                tsec = int(self.entry_time.get().strip())
-                if tsec < 3:
-                    messagebox.showerror("Eroare", "Timp prea mic (<3s).")
-                    return
-                if tsec > 120:
-                    messagebox.showerror("Eroare", "Timp prea mare (>120s).")
-                    return
-            except ValueError:
-                messagebox.showerror("Eroare", "Timpul per întrebare trebuie să fie număr.")
-                return
-        else:
-            tsec = None
-
-        # deschidem o fereastră nouă care rulează quiz-ul în GUI
-        QuizWindow(
-            master=self,
-            domeniu=domeniu_real,
-            num_intrebari=num_q,
-            mode=mode,
-            time_limit_sec=tsec
-        )
-
-    def generate_chart(self):
-        # rulăm progress_chart.py ca script separat
-        try:
-            result = subprocess.run(
-                ["python", CHART_SCRIPT],
-                check=True,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace"
-            )
-            # după generare, verificăm dacă există imaginea
-            if os.path.exists(PROGRESS_IMG_PATH):
-                messagebox.showinfo(
-                    "Grafic generat",
-                    f"Graficul a fost salvat ca:\n{PROGRESS_IMG_PATH}\n\nPoți deschide PNG-ul să vezi trendul scorurilor tale."
-                )
-            else:
-                messagebox.showwarning(
-                    "Atenție",
-                    "Scriptul a rulat, dar nu am găsit progress_chart.png."
-                )
-        except subprocess.CalledProcessError as e:
-            messagebox.showerror("Eroare la grafic", e.stderr or str(e))
-
-    def generate_pdf(self):
-        # rulăm export_pdf.py ca script separat
-        try:
-            result = subprocess.run(
-                ["python", PDF_EXPORT_SCRIPT],
-                check=True,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace"
-            )
-            # outputul scriptului îl punem într-un popup
-            messagebox.showinfo("Export PDF", result.stdout.strip())
-        except subprocess.CalledProcessError as e:
-            messagebox.showerror("Eroare la PDF", e.stderr or str(e))
-
-    def show_stats_popup(self):
-        # capturăm outputul din show_dashboard() într-un popup
-        import io
-        import sys
-        buf = io.StringIO()
-        old_stdout = sys.stdout
-        sys.stdout = buf
-        try:
-            show_dashboard()
+            subprocess.run(["python", "./src/progress_chart.py"], check=True)
         except Exception as e:
-            buf.write(f"Eroare la stats: {e}")
-        finally:
-            sys.stdout = old_stdout
+            messagebox.showerror("Eroare la grafic", str(e))
 
-        content = buf.getvalue()
+    def run_pdf(self):
+        try:
+            subprocess.run(["python", "./src/export_pdf.py"], check=True)
+        except Exception as e:
+            messagebox.showerror("Eroare la PDF", str(e))
 
-        win = tk.Toplevel(self)
-        win.title("Progres personal (stats)")
-        win.geometry("480x320")
-        win.configure(bg="#111111")
-
-        txt = tk.Text(
-            win,
-            bg="#1F1F1F",
-            fg="#FFFFFF",
-            insertbackground="#FFFFFF",
-            wrap="word",
-            relief="flat"
-        )
-        txt.pack(fill="both", expand=True, padx=10, pady=10)
-        txt.insert("1.0", content)
-        txt.config(state="disabled")
-
-
-def main():
-    app = MainWindow()
-    app.mainloop()
+    def run_stats(self):
+        try:
+            subprocess.run(["python", "./src/stats.py"], check=True)
+        except Exception as e:
+            messagebox.showerror("Eroare la stats", str(e))
 
 
 if __name__ == "__main__":
-    main()
+    app = MainApp()
+    app.mainloop()
