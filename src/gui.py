@@ -14,6 +14,7 @@ from progress_chart import main as generate_chart
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 
+
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
 
 
@@ -207,9 +208,9 @@ class FEAGui(tk.Tk):
         self.config_data = load_config()
         self.theme = self.load_theme()
 
-        # ✅ FIX STABIL (fără evenimente multiple)
-        self.after(200, self.make_background)
-        self.after(300, self.build_ui)
+        # ✅ FIX FINAL (sigur, fără pyimage1)
+        self.after(500, self.safe_make_background)
+        self.after(700, self.build_ui)
 
     def load_theme(self):
         if self.config_data.get("theme", "dark") == "light":
@@ -217,10 +218,16 @@ class FEAGui(tk.Tk):
         else:
             return {"bg": "#111", "text": "white", "accent": "#00ffff"}
 
+    # 🔥 Protecție completă — reîncearcă dacă imaginea nu e încă gata
+    def safe_make_background(self):
+        try:
+            self.make_background()
+        except tk.TclError:
+            self.after(200, self.safe_make_background)
+
     def make_background(self):
         if not self.winfo_exists():
             return
-        # ✅ Nu recreăm fundalul dacă deja există
         if hasattr(self, "bg_img"):
             return
 
