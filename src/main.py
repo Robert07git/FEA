@@ -24,20 +24,31 @@ def alege_domeniu():
     print()
 
     alegere = input("Introdu numărul domeniului (1-6): ").strip()
-
-    # fallback: dacă bagi aiurea, alegem 'mix'
     domeniu = DOMENII.get(alegere, "mix")
     print(f"\nAi ales domeniul: {domeniu.upper()}.\n")
     return domeniu
 
 
+def alege_numar_intrebari(max_intrebari, domeniu_curent):
+    """
+    Întreabă utilizatorul câte întrebări vrea, dar nu îl lasă să depășească
+    numărul de întrebări disponibile pentru domeniul ales.
+    """
+    while True:
+        try:
+            num = int(input(
+                f"Câte întrebări vrei să ai în test pentru domeniul '{domeniu_curent}'? (maxim {max_intrebari}) "
+            ))
+            if 1 <= num <= max_intrebari:
+                return num
+            else:
+                print(f"Ai cerut {num}, dar domeniul '{domeniu_curent}' are doar {max_intrebari} întrebări disponibile.")
+                print("Te rog introdu un număr valid.\n")
+        except ValueError:
+            print("Introdu un număr valid (ex: 5, 10).")
+
+
 def salveaza_scor(domeniu, score, asked, pct):
-    """
-    Salvează rezultatul într-un fișier text numit score_history.txt
-    Format linie:
-    2025-10-24 20:13 | domeniu=crash | scor=8/10 | procent=80.0%
-    """
-    # baza proiectului = folderul părinte al lui src
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     history_path = os.path.join(base_dir, "score_history.txt")
 
@@ -48,39 +59,51 @@ def salveaza_scor(domeniu, score, asked, pct):
         with open(history_path, "a", encoding="utf-8") as f:
             f.write(line)
     except Exception as e:
-        # nu blocăm aplicația dacă nu putem scrie, doar informăm
         print(f"[Avertisment] Nu am putut salva scorul în score_history.txt: {e}")
 
 
 def main():
+    # 1. Alege domeniul
     domeniu_selectat = alege_domeniu()
 
-    # încărcăm întrebările filtrate pe domeniul ales
+    # 2. Încarcă întrebările filtrate pentru domeniul respectiv
     questions = load_questions(domain=domeniu_selectat)
 
-    # stabilim câte întrebări punem în sesiune
-    num_q = 10
-    if len(questions) < num_q:
-        num_q = len(questions)
+    # 3. Verificăm câte întrebări sunt disponibile
+    max_intrebari = len(questions)
 
-    score, asked = run_quiz(questions, num_questions=num_q)
+    if max_intrebari == 0:
+        print("Nu există întrebări pentru domeniul ales. Se folosește automat MIX.")
+        domeniu_selectat = "mix"
+        questions = load_questions(domain=domeniu_selectat)
+        max_intrebari = len(questions)
 
+    # 4. Întreabă utilizatorul câte întrebări vrea
+    num_q = alege_numar_intrebari(max_intrebari, domeniu_selectat)
+
+    # 5. Rulăm quiz-ul cu timer per întrebare (de ex. 15 secunde)
+    TIME_LIMIT_SEC = 15
+    score, asked = run_quiz(
+        questions,
+        num_questions=num_q,
+        time_limit_sec=TIME_LIMIT_SEC
+    )
+
+    # 6. Afișăm rezultatul final
     print("=== REZULTAT FINAL ===")
     print(f"Scor: {score}/{asked}")
     pct = (score / asked) * 100 if asked > 0 else 0
     print(f"Asta înseamnă {pct:.1f}% corect.")
     print()
 
-    # feedback verbal
     if pct >= 80:
         print("Bravo, ești pe drumul bun pentru un interviu CAE junior 👌")
     elif pct >= 50:
         print("E ok, dar mai lucrează la conceptele mai slabe din domeniul ales.")
-        print("Reia întrebările și rulează din nou quiz-ul.")
     else:
         print("Nu-i panică. Reia teoria de bază. Asta se învață 💪")
 
-    # salvăm scorul în istoric
+    # 7. Salvăm scorul în istoric
     salveaza_scor(domeniu_selectat, score, asked, pct)
     print("\nRezultatul a fost salvat în score_history.txt ✅")
 
