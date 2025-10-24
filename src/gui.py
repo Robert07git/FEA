@@ -124,7 +124,6 @@ class QuizWindow(tk.Toplevel):
 
     def make_hover_button(self, text, cmd):
         b = tk.Button(self, text=text, bg="#00bfff", fg="white", font=("Segoe UI", 10, "bold"), command=cmd)
-
         def on_enter(e): b.config(bg="#00ffff")
         def on_leave(e): b.config(bg="#00bfff")
         b.bind("<Enter>", on_enter)
@@ -208,9 +207,9 @@ class FEAGui(tk.Tk):
         self.config_data = load_config()
         self.theme = self.load_theme()
 
-        # ✅ FIX pentru eroarea „pyimage1 doesn’t exist”
-        self.bind("<Map>", lambda e: self.make_background())
-        self.after(100, self.build_ui)
+        # ✅ FIX STABIL (fără evenimente multiple)
+        self.after(200, self.make_background)
+        self.after(300, self.build_ui)
 
     def load_theme(self):
         if self.config_data.get("theme", "dark") == "light":
@@ -220,6 +219,9 @@ class FEAGui(tk.Tk):
 
     def make_background(self):
         if not self.winfo_exists():
+            return
+        # ✅ Nu recreăm fundalul dacă deja există
+        if hasattr(self, "bg_img"):
             return
 
         width, height = 1000, 700
