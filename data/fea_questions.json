@@ -1,112 +1,122 @@
 [
   {
-    "question": "Ce reprezintă un grad de libertate (DOF) într-un nod 3D pentru un element solid clasic?",
+    "domain": "structural",
+    "question": "Ce reprezintă un grad de libertate (DOF) într-un nod pentru o analiză structurală 3D cu elemente solid?",
     "choices": [
       "Numărul de elemente conectate la nod",
       "Direcțiile independente în care nodul poate să se deplaseze",
-      "Numărul de iterații în solver",
-      "Dimensiunea elementului"
+      "Numărul maxim de iterații din solver",
+      "Volumul elementului atașat nodului"
     ],
     "correct_index": 1,
-    "explanation": "Un DOF (degree of freedom) este o posibilă mișcare independentă. Pentru un element solid 3D tipic ai 3 DOF pe nod: deplasare în X, Y, Z."
+    "explanation": "Un DOF (degree of freedom) este o mișcare independentă. Pentru un element solid 3D obișnuit ai 3 DOF pe nod: deplasări pe X, Y, Z."
   },
   {
-    "question": "La ce folosește o condiție la limită (boundary condition / BC) de tip 'fixed'?",
-    "choices": [
-      "Aplică o forță constantă pe un nod",
-      "Blochează complet translațiile și rotațiile acelui nod",
-      "Optimizează mesh-ul automat",
-      "Setează materialul ca rigid"
-    ],
-    "correct_index": 1,
-    "explanation": "O prindere 'fixed' ideală înseamnă că nodul nu are voie să se miște sau să se rotească: toate DOF sunt blocate."
-  },
-  {
+    "domain": "structural",
     "question": "Care este diferența principală dintre un element solid (hexa/tetra) și un element shell?",
     "choices": [
-      "Shell are grosime mică și poate reprezenta plăci / tablă, solidul reprezintă volum 3D",
-      "Shell este mereu mai precis decât solidul",
-      "Shell nu poate avea proprietăți de material",
-      "Solidul nu poate suporta încărcări la compresiune"
-    ],
-    "correct_index": 0,
-    "explanation": "Elementele shell sunt folosite pentru structuri subțiri (caroserie auto, tablă), au grosime definită separat. Elementele solid modelează volum 3D complet."
-  },
-  {
-    "question": "De ce e important raportul de aspect (aspect ratio) al elementelor în mesh?",
-    "choices": [
-      "Determină culoarea modelului în post-procesare",
-      "Controlează stabilitatea numerică și acuratețea rezultatelor",
-      "Nu are nicio importanță la FEA implicită",
-      "Determină dacă solverul rulează pe CPU sau GPU"
-    ],
-    "correct_index": 1,
-    "explanation": "Elementele foarte 'alungite' (aspect ratio mare) dau erori numerice și stres artificial. Mesh-ul de calitate are elemente cât mai aproape de forme regulate."
-  },
-  {
-    "question": "Ce înseamnă contact în analiza de impact (crash)?",
-    "choices": [
-      "O constrângere care interzice penetrarea dintre două suprafețe",
-      "O metodă de a mări grosimea materialului",
-      "O funcție de randare grafică",
-      "O condiție de temperatură constantă"
-    ],
-    "correct_index": 0,
-    "explanation": "Contactul definește interacțiunea dintre două piese când se lovesc sau se ating, prevenind interpenetrarea și permițând frecare."
-  },
-  {
-    "question": "Ce reprezintă o curbă forță–deplasare într-un test de crash local (ex. impact frontal într-o zonă de longeroane)?",
-    "choices": [
-      "Rezistența structurală și modul de absorbție a energiei",
-      "Viteza solverului",
-      "Doar rigiditatea elastică, fără plasticitate",
-      "Doar masa vehiculului"
-    ],
-    "correct_index": 0,
-    "explanation": "Forță–deplasare îți arată câtă forță preia structura pe măsură ce se deformează. Practic vezi cum absoarbe energie la impact."
-  },
-  {
-    "question": "De ce aplicăm condiții de simetrie în FEA?",
-    "choices": [
-      "Ca să colorăm doar jumătate din model",
-      "Ca să reducem dimensiunea modelului și timpul de calcul",
-      "Ca să creștem grosimea materialului",
-      "Ca să anulăm frecarea în contact"
-    ],
-    "correct_index": 1,
-    "explanation": "Dacă piesa și încărcarea sunt simetrice, poți modela doar jumătate / un sfert. Economisești elemente și timp de rulare enorm."
-  },
-  {
-    "question": "Ce tip de element folosești de obicei pentru modelarea caroseriei auto într-o analiză de crash frontal?",
-    "choices": [
-      "Elemente solid hexa volumice groase",
-      "Elemente beam 1D",
-      "Elemente shell subțiri cu grosime definită",
-      "Doar puncte fără conectivitate"
+      "Elementul solid are grosime mică și modelează doar suprafața",
+      "Elementul shell nu are proprietăți de material",
+      "Elementul shell descrie plăci/subansamble subțiri cu grosime definită, solidul modelează volum 3D complet",
+      "Elementul solid nu poate suporta compresiune"
     ],
     "correct_index": 2,
-    "explanation": "Caroseria (tablă presată) se modelează aproape întotdeauna cu shell-uri. Asta reduce numărul de elemente dar păstrează comportamentul corect."
+    "explanation": "Shell se folosește pentru piese subțiri (tablă, caroserie), are grosime definită separat. Solidul reprezintă volum complet al materialului."
   },
   {
-    "question": "Ce înseamnă 'material plastic' într-o simulare de impact?",
+    "domain": "structural",
+    "question": "De ce este importantă calitatea mesh-ului într-o analiză structurală?",
     "choices": [
-      "Material care se evaporă la încălzire",
-      "Material care rămâne complet elastic după descărcare",
-      "Material care poate suferi deformații permanente",
-      "Material care nu are densitate"
+      "Pentru că schimbă culoarea modelului în post-procesare",
+      "Pentru a reduce greutatea fizică a piesei",
+      "Pentru stabilitate numerică și rezultate (tensiuni, deformații) mai corecte",
+      "Nu are importanță atâta timp cât solverul rulează până la capăt"
     ],
     "correct_index": 2,
-    "explanation": "Plastic = după ce ai scos încărcarea, nu revine la forma inițială complet. E esențial pentru crash deoarece energia se disipă prin deformare permanentă."
+    "explanation": "Elementele foarte distorsionate (aspect ratio mare, unghiuri proaste) pot produce tensiuni artificiale și pot destabiliza soluția."
   },
   {
-    "question": "De ce definim mase concentrate (lumped masses) în unele modele?",
+    "domain": "structural",
+    "question": "Ce înseamnă o condiție la limită (boundary condition) de tip 'fix' aplicată pe o față a piesei?",
     "choices": [
-      "Ca să trișăm solverul și să termine instant",
-      "Ca să simulăm inerția unor componente fără să le meshuim geometric detaliat",
-      "Ca să blocăm toate DOF-urile",
-      "Ca să anulăm gravitația"
+      "Aplic o forță constantă pe acea față",
+      "Blochez toate translațiile și rotațiile nodurilor de pe acea față",
+      "Setez materialul acelei zone ca fiind rigid infinit",
+      "Permite doar rotația liberă fără translații"
     ],
     "correct_index": 1,
-    "explanation": "Dacă ai, de exemplu, un motor reprezentat doar ca un bloc simplificat, îi poți pune masa totală ca 'lumped mass' ca să păstrezi inerția fără mesh foarte fin."
+    "explanation": "O prindere fixă ideală înseamnă DOF blocate: nodurile nu se pot deplasa și nu se pot roti. Este o condiție foarte rigidă."
+  },
+  {
+    "domain": "structural",
+    "question": "Care dintre următoarele descrie corect tensiunea Von Mises?",
+    "choices": [
+      "Este tensiunea normală maximă pe direcția X",
+      "Este tensiunea medie pe toate direcțiile",
+      "Este un criteriu echivalent folosit pentru a evalua cedarea plastică în materiale ductile",
+      "Este doar presiune hidrostatică"
+    ],
+    "correct_index": 2,
+    "explanation": "Tensiunea Von Mises combină componentele tensiunii într-o valoare scalară care se compară cu limita de curgere pentru materiale ductile (oțel, aluminiu etc.)."
+  },
+  {
+    "domain": "structural",
+    "question": "Ce diferență majoră există între o analiză liniară și una neliniară structurală?",
+    "choices": [
+      "Analiza liniară rulează doar pe GPU, neliniara doar pe CPU",
+      "Analiza neliniară poate include mari deformații, contact și comportament plastic",
+      "Analiza liniară nu are nevoie de mesh",
+      "Analiza neliniară nu poate avea încărcări mecanice"
+    ],
+    "correct_index": 1,
+    "explanation": "Analiza neliniară ia în calcul efecte cum ar fi: mari deformații geometrice, material plastic, contact între piese. Analiza liniară presupune răspuns elastic mic și relație forță-deplasare proporțională."
+  },
+  {
+    "domain": "structural",
+    "question": "Ce este o 'constrângere de simetrie' într-o analiză structurală?",
+    "choices": [
+      "Permite doar rotația liberă a nodurilor",
+      "Forțează nodurile să aibă deplasare zero pe o direcție normală la un plan",
+      "Aplică o sarcină uniformă pe zona respectivă",
+      "Umple automat mesh-ul pe cealaltă jumătate a modelului"
+    ],
+    "correct_index": 1,
+    "explanation": "Simetria spune solverului că pe acel plan deplasarea normală e zero. Asta îți permite să modelezi doar jumătate/ sfertul piesei și să economisești timp de calcul."
+  },
+  {
+    "domain": "structural",
+    "question": "Ce reprezintă 'strain' (deformația unitară) într-o analiză structurală?",
+    "choices": [
+      "Modificarea temperaturii materialului",
+      "Raportul dintre deplasarea relativă și lungimea inițială",
+      "Greutatea totală a componentului",
+      "Rotația elementului în jurul axei Z"
+    ],
+    "correct_index": 1,
+    "explanation": "Strain = (ΔL / L0). Măsoară cât de mult s-a întins/comprimat un material relativ la lungimea inițială. E fără unitate."
+  },
+  {
+    "domain": "structural",
+    "question": "De ce facem 'mesh refinement' (rafina mesh-ul) într-o zonă cu concentrator de tensiune (ex: gaură, colț ascuțit)?",
+    "choices": [
+      "Ca să reducem numărul total de elemente",
+      "Ca să obținem tensiuni locale mai detaliate și mai corecte",
+      "Ca să ștergem complet efectul concentratorului",
+      "Ca să blocăm deplasările în acea zonă"
+    ],
+    "correct_index": 1,
+    "explanation": "În zonele unde tensiunile cresc brusc (găuri, colțuri), e nevoie de elemente mai mici ca solverul să poată capta corect variația tensiunii."
+  },
+  {
+    "domain": "structural",
+    "question": "Ce înseamnă 'convergența' într-o analiză structurală neliniară iterativă?",
+    "choices": [
+      "Solverul a terminat de rulat fără erori, indiferent de rezultate",
+      "Forțele interne din model se echilibrează cu forțele aplicate în limita unei toleranțe",
+      "Mesh-ul a fost generat fără elemente distorsionate",
+      "Materialul este pur elastic"
+    ],
+    "correct_index": 1,
+    "explanation": "Convergență = diferența dintre reacțiile interne și încărcarea aplicată a devenit suficient de mică (sub toleranță). Asta înseamnă că solverul a găsit un echilibru mecanic stabil pentru pasul curent."
   }
 ]
