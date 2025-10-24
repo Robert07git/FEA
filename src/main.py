@@ -97,9 +97,85 @@ def salveaza_scor(domeniu, mode, score, asked, pct, durata_sec, timp_per_intreba
         print(f"[Avertisment] Nu am putut salva scorul în score_history.txt: {e}")
 
 
+def genereaza_review_text(domeniu, mode, score, asked, pct, durata_sec, timp_per_intrebare, results):
+    """
+    Construiește textul raportului pentru sesiunea EXAM.
+    Include doar întrebările greșite / fără răspuns.
+    """
+    gresite = [r for r in results if not r["correct"]]
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    header = []
+    header.append("=== RAPORT EXAM FEA QUIZ ===")
+    header.append(f"Data: {timestamp}")
+    header.append(f"Domeniu testat: {domeniu}")
+    header.append(f"Mod: {mode.upper()}")
+    header.append(f"Scor: {score}/{asked}  ({pct:.1f}%)")
+    header.append(f"Timp total: {durata_sec:.1f} sec (~{durata_sec/60:.1f} min)")
+    header.append(f"Timp per întrebare în EXAM: {timp_per_intrebare}")
+    header.append("")
+    header.append("Întrebări care necesită atenție (greșite / fără răspuns):")
+    header.append("")
+
+    body_lines = []
+
+    if not gresite:
+        body_lines.append("Ai răspuns corect la toate întrebările. Excelent 🎯")
+    else:
+        for r in gresite:
+            idx = r["idx"]
+            qtext = r["question"]
+            choices = r["choices"]
+            correct_idx = r["correct_index"]
+            expl = r["explanation"]
+            domeniu_q = r["domain"]
+
+            body_lines.append("------------------------------------------------------------")
+            body_lines.append(f"Q{idx} ({domeniu_q}) -> {qtext}")
+            body_lines.append(f"Răspuns corect: {correct_idx+1}. {choices[correct_idx]}")
+            body_lines.append("Explicație: " + expl)
+            body_lines.append("")
+
+    return "\n".join(header + body_lines)
+
+
+def salveaza_review_exam(domeniu, mode, score, asked, pct, durata_sec, timp_per_intrebare, results):
+    """
+    Dacă modul este EXAM, salvăm un fișier text separat cu întrebările greșite.
+    Numele fișierului: exam_review_YYYY-MM-DD_HH-MM.txt
+    """
+    if mode != "exam":
+        return None  # nu facem fișier pentru TRAIN
+
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    timestamp_file = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    filename = f"exam_review_{timestamp_file}.txt"
+    path = os.path.join(base_dir, filename)
+
+    content = genereaza_review_text(
+        domeniu=domeniu,
+        mode=mode,
+        score=score,
+        asked=asked,
+        pct=pct,
+        durata_sec=durata_sec,
+        timp_per_intrebare=timp_per_intrebare,
+        results=results
+    )
+
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return path
+    except Exception as e:
+        print(f"[Avertisment] Nu am putut salva raportul EXAM: {e}")
+        return None
+
+
 def afiseaza_revizuire_exam(results):
     """
-    După EXAM: afișăm doar întrebările greșite / fără răspuns,
+    După EXAM: afișăm în consolă doar întrebările greșite / fără răspuns,
     cu răspunsul corect și explicația, ca să poți învăța.
     """
     gresite = [r for r in results if not r["correct"]]
@@ -115,10 +191,10 @@ def afiseaza_revizuire_exam(results):
         choices = r["choices"]
         correct_idx = r["correct_index"]
         expl = r["explanation"]
-        domeniu = r["domain"]
+        domeniu_q = r["domain"]
 
         print("------------------------------------------------------------")
-        print(f"Q{idx} ({domeniu}) -> {qtext}")
+        print(f"Q{idx} ({domeniu_q}) -> {qtext}")
         print(f"Răspuns corect: {correct_idx+1}. {choices[correct_idx]}")
         print("Explicație:", expl)
         print()
@@ -178,11 +254,11 @@ def main():
     else:
         print("Nu-i panică. Reia teoria de bază. Asta se învață 💪")
 
-    # 8. Dacă ai fost în modul EXAM, îți arătăm greșelile după scor
+    # 8. Dacă ai fost în modul EXAM, îți arătăm greșelile pe ecran
     if mode == "exam":
         afiseaza_revizuire_exam(results)
 
-    # 9. Salvăm scorul + timpul în istoricul local
+    # 9. Salvăm scorul în istoricul general
     salveaza_scor(
         domeniu_selectat,
         mode,
@@ -192,6 +268,21 @@ def main():
         durata_sec,
         f"{time_limit_sec}s" if time_limit_sec is not None else "-"
     )
+
+    # 10. Salvăm raportul EXAM într-un fișier separat (doar în modul EXAM)
+    review_path = salveaza_review_exam(
+        domeniu=domeniu_selectat,
+        mode=mode,
+        score=score,
+        asked=asked,
+        pct=pct,
+        durata_sec=durata_sec,
+        timp_per_intrebare=f"{time_limit_sec}s" if time_limit_sec is not None else "-",
+        results=results
+    )
+
+    if review_path:
+        print(f"\nRaportul EXAM a fost salvat în: {review_path} ✅")
 
     print("\nRezultatul a fost salvat în score_history.txt ✅")
 
