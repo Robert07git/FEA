@@ -1,190 +1,129 @@
-import random
+import tkinter as tk
+from tkinter import messagebox
 import time
-import sys
+import os
+import random
+from data_loader import get_random_questions
 
-# Pentru citire cu timeout pe Windows folosim msvcrt.
-# Dacă nu e Windows, fallback fără timeout.
-try:
-    import msvcrt
-    HAS_MS = True
-except ImportError:
-    HAS_MS = False
+def run_quiz(domain, num_q, mode, tlim=None):
+    """Rulează un quiz într-o fereastră nouă (TRAIN / EXAM)."""
+    questions = get_random_questions(domain, num_q)
+    if not questions:
+        messagebox.showerror("Eroare", "Nu s-au găsit întrebări pentru acest domeniu.")
+        return
 
-
-def _timed_input(prompt: str, timeout_seconds: int | None):
-    """
-    Citește input de la utilizator cu timeout (dacă timeout_seconds nu e None).
-    Dacă timeout_seconds este None -> comportament normal input() fără limită.
-
-    Returnează:
-    - stringul tastat (fără whitespace la capete), sau
-    - None dacă a expirat timpul (doar în modul cu timeout)
-    """
-    # Fără limită de timp: folosim input normal
-    if timeout_seconds is None:
-        answer = input(prompt)
-        return answer.strip()
-
-    # Dacă nu avem msvcrt (alt OS decât Windows), fallback fără timeout
-    if not HAS_MS:
-        answer = input(prompt)
-        return answer.strip()
-
-    # Windows + msvcrt: citim tastă cu tastă, cu timeout
-    sys.stdout.write(prompt)
-    sys.stdout.flush()
-
-    entered = ""
-    start = time.time()
-
-    while True:
-        # dacă utilizatorul tastează ceva
-        if msvcrt.kbhit():
-            ch = msvcrt.getwch()  # getwch -> suportă Unicode/diacritice
-
-            # Enter => finalizează inputul
-            if ch == "\r" or ch == "\n":
-                sys.stdout.write("\n")
-                sys.stdout.flush()
-                return entered.strip()
-
-            # Backspace => ștergem ultimul char
-            if ch == "\b":
-                if len(entered) > 0:
-                    entered = entered[:-1]
-                    # ștergere vizuală
-                    sys.stdout.write("\b \b")
-                    sys.stdout.flush()
-                continue
-
-            # caracter normal
-            entered += ch
-            sys.stdout.write(ch)
-            sys.stdout.flush()
-
-        # verifică timeout
-        if (time.time() - start) > timeout_seconds:
-            sys.stdout.write("\n")
-            sys.stdout.flush()
-            return None
-
-        time.sleep(0.05)
+    app = QuizWindow(questions, mode, tlim)
+    app.mainloop()
 
 
-def run_quiz(questions, num_questions=10, mode="train", time_limit_sec=None):
-    """
-    Rulează quiz-ul.
+class QuizWindow(tk.Tk):
+    def __init__(self, questions, mode, tlim):
+        super().__init__()
+        self.title("FEA Quiz Session")
+        self.geometry("800x500")
+        self.configure(bg="#111")
 
-    Parametri:
-    - questions: list[dict] cu chei:
-        "question", "choices", "correct_index", "explanation", "domain"
-    - num_questions: câte întrebări se scot în sesiune
-    - mode: "train" sau "exam"
-        * train -> fără limită de timp, feedback imediat
-        * exam  -> limită de timp, feedback abia la final
-    - time_limit_sec: secunde per întrebare în modul exam.
-                      ignorat dacă mode == "train"
+        self.questions = questions
+        self.mode = mode
+        self.tlim = tlim
+        self.index = 0
+        self.correct = 0
+        self.answers = []
 
-    Returnează:
-    - score: câte răspunsuri corecte
-    - asked: câte întrebări au fost puse
-    - results: list de dict cu detalii pe fiecare întrebare
-    """
+        self.remaining = tlim if mode == "exam" else None
+        self.timer_running = False
 
-    # amestecăm întrebările și alegem primele N
-    random.shuffle(questions)
-    selected = questions[:num_questions]
+        self.start_time = time.time()
 
-    results = []
-    score = 0
-    asked = 0
+        self.setup_ui()
+        self.show_question()
 
-    for idx, q in enumerate(selected, start=1):
-        question_text = q.get("question", "???")
-        choices = q.get("choices", [])
-        correct_index = q.get("correct_index", 0)
-        explanation = q.get("explanation", "(fără explicație)")
-        domain = q.get("domain", "n/a")
+        if self.mode == "exam" and self.tlim:
+            self.start_timer()
 
-        print("------------------------------------------------------------")
-        print(f"Q{idx}: {question_text}")
-        print(f"(domeniu: {domain})")
-        print()
+    def setup_ui(self):
+        self.lbl_title = tk.Label(self, text="FEA Quiz", font=("Segoe UI", 16, "bold"), bg="#111", fg="#00ffff")
+        self.lbl_title.pack(pady=10)
 
-        for i, choice in enumerate(choices):
-            print(f"{i+1}. {choice}")
-        print()
+        self.lbl_q = tk.Label(self, text="", wraplength=700, bg="#111", fg="white", font=("Segoe UI", 12))
+        self.lbl_q.pack(pady=20)
 
-        # construim prompt-ul în funcție de mod
-        if mode == "exam":
-            prompt = f"Răspunsul tău (1-{len(choices)}) [timp: {time_limit_sec}s]: "
-            timeout = time_limit_sec
+        self.var_ans = tk.StringVar()
+        self.option_buttons = []
+        for _ in range(4):
+            btn = tk.Radiobutton(self, text="", variable=self.var_ans, value="", font=("Segoe UI", 11),
+                                 fg="white", bg="#111", selectcolor="#222")
+            btn.pack(anchor="w", padx=100)
+            self.option_buttons.append(btn)
+
+        self.lbl_timer = tk.Label(self, text="", fg="#00ffff", bg="#111", font=("Segoe UI", 10))
+        self.lbl_timer.pack(pady=10)
+
+        self.btn_next = tk.Button(self, text="Următoarea ➜", command=self.next_question,
+                                  bg="#00ffff", fg="black", font=("Segoe UI", 10, "bold"))
+        self.btn_next.pack(pady=10)
+
+    def show_question(self):
+        q = self.questions[self.index]
+        self.lbl_q.config(text=f"Întrebarea {self.index + 1}/{len(self.questions)}:\n\n{q['question']}")
+        opts = q["options"]
+        random.shuffle(opts)
+
+        for i, opt in enumerate(opts):
+            self.option_buttons[i].config(text=opt, value=opt)
+        self.var_ans.set(None)
+
+    def next_question(self):
+        chosen = self.var_ans.get()
+        if not chosen:
+            messagebox.showwarning("Atenție", "Selectează un răspuns înainte de a continua!")
+            return
+
+        correct_ans = self.questions[self.index]["answer"]
+
+        if chosen == correct_ans:
+            self.correct += 1
+            if self.mode == "train":
+                messagebox.showinfo("Corect ✅", f"{correct_ans} este răspunsul corect!")
         else:
-            prompt = f"Răspunsul tău (1-{len(choices)}): "
-            timeout = None  # fără limită de timp
+            if self.mode == "train":
+                messagebox.showerror("Greșit ❌", f"Răspuns corect: {correct_ans}")
 
-        answer_raw = _timed_input(prompt, timeout)
+        self.index += 1
 
-        # determinăm indexul ales
-        timed_out = (answer_raw is None)
-        chosen_index = None
-
-        if not timed_out:
-            try:
-                chosen_index = int(answer_raw) - 1
-            except (TypeError, ValueError):
-                chosen_index = None
-
-        # verificăm dacă e corect
-        is_valid_choice = (
-            chosen_index is not None and
-            0 <= chosen_index < len(choices)
-        )
-        is_correct = is_valid_choice and (chosen_index == correct_index)
-
-        if is_correct:
-            score += 1
-
-        asked += 1
-
-        # feedback diferit în funcție de mod
-        if mode == "train":
-            # în TRAIN spunem imediat dacă e corect și de ce
-            if timed_out:
-                print("\nNu ai răspuns (fără limită de timp în TRAIN, deci asta nu ar trebui să apară).")
-            else:
-                print(f"\nAi răspuns: {answer_raw}")
-                if is_correct:
-                    print("Corect ✅")
-                else:
-                    print("Greșit ❌")
-                    if is_valid_choice:
-                        print(f"Răspuns corect: {correct_index+1}. {choices[correct_index]}")
-                    else:
-                        print("Răspuns invalid.")
-                        print(f"Răspuns corect: {correct_index+1}. {choices[correct_index]}")
-            print("Explicație:", explanation)
-            print()
-
+        if self.index >= len(self.questions):
+            self.finish_quiz()
         else:
-            # în EXAM nu dezvăluim nimic acum
-            if timed_out:
-                print("Timp expirat ⏱️")
-            else:
-                print("Răspuns înregistrat.")
-            print()
+            self.show_question()
 
-        # salvăm rezultatul acestei întrebări pentru analiză finală (mai ales la EXAM)
-        results.append({
-            "idx": idx,
-            "domain": domain,
-            "question": question_text,
-            "choices": choices,
-            "correct_index": correct_index,
-            "user_index": chosen_index,
-            "timed_out": timed_out,
-            "correct": is_correct,
-            "explanation": explanation,
-        })
+    def start_timer(self):
+        if not self.timer_running:
+            self.timer_running = True
+            self.update_timer()
 
-    return score, asked, results
+    def update_timer(self):
+        if self.remaining is not None:
+            self.lbl_timer.config(text=f"Timp rămas: {self.remaining}s")
+            if self.remaining <= 0:
+                self.finish_quiz()
+                return
+            self.remaining -= 1
+            self.after(1000, self.update_timer)
+
+    def finish_quiz(self):
+        end_time = time.time()
+        duration = end_time - self.start_time
+        avg_time_per_q = duration / len(self.questions)
+
+        score = int((self.correct / len(self.questions)) * 100)
+        msg = f"Scor final: {self.correct}/{len(self.questions)} ({score}%)\n\nTimp total: {duration:.1f}s\nTimp mediu / întrebare: {avg_time_per_q:.1f}s"
+        messagebox.showinfo("Rezultat", msg)
+        self.save_score(score, duration, avg_time_per_q)
+        self.destroy()
+
+    def save_score(self, score, duration, avg_time):
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        hist_path = os.path.join(base_dir, "score_history.txt")
+
+        with open(hist_path, "a", encoding="utf-8") as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} | domeniu={self.questions[0]['domain']} | mod={self.mode} | scor={self.correct}/{len(self.questions)} | procent={score}% | timp_total={duration:.1f}s | timp_intrebare={avg_time:.1f}s\n")
