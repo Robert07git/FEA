@@ -4,6 +4,38 @@ import time
 import os
 from playsound import playsound
 
+class LoadingScreen(tk.Toplevel):
+    def __init__(self, master):
+        super().__init__(master)
+        self.title("FEA Quiz Trainer")
+        self.geometry("500x300")
+        self.configure(bg="#111")
+        self.overrideredirect(True)
+
+        tk.Label(self, text="FEA Quiz Trainer",
+                 font=("Segoe UI", 20, "bold"),
+                 fg="#00FFFF", bg="#111").pack(pady=60)
+        self.status = tk.Label(self, text="Se încarcă...",
+                               font=("Segoe UI", 12),
+                               fg="white", bg="#111")
+        self.status.pack(pady=10)
+
+        self.progress = tk.Frame(self, bg="#222", width=350, height=20)
+        self.progress.pack(pady=15)
+        self.progress.pack_propagate(False)
+        self.progress_bar = tk.Frame(self.progress, bg="#00FFFF", width=0, height=20)
+        self.progress_bar.pack(side="left", fill="y")
+
+        self.animate_progress()
+
+    def animate_progress(self):
+        for i in range(0, 351, 10):
+            self.progress_bar.config(width=i)
+            self.status.config(text=f"Se încarcă... {int(i/3.5)}%")
+            self.update()
+            time.sleep(0.05)
+        self.destroy()
+
 
 class QuizWindow(tk.Toplevel):
     def __init__(self, master, questions, mode, time_limit=None):
@@ -11,6 +43,10 @@ class QuizWindow(tk.Toplevel):
         self.title("FEA Quiz Session")
         self.geometry("900x600")
         self.configure(bg="#111")
+
+        # Loading screen intro
+        load = LoadingScreen(self)
+        self.wait_window(load)
 
         self.questions = questions
         self.mode = mode
@@ -79,13 +115,18 @@ class QuizWindow(tk.Toplevel):
 
     # ----------------------------------------------------------
     def build_options_ui(self, q):
+        # Distruge cadrul vechi (curățare)
         if self.options_frame is not None and self.options_frame.winfo_exists():
             self.options_frame.destroy()
 
+        # Creează un cadru nou pentru opțiuni
         self.options_frame = tk.Frame(self.options_parent, bg="#111")
         self.options_frame.pack()
 
-        self.selected_answer = tk.StringVar(value="")
+        # Inițializează variabila de selecție înainte de crearea radiobuttonurilor
+        self.selected_answer = tk.StringVar()
+        self.selected_answer.set("")  # fără selecție implicită
+
         self.option_buttons = []
 
         for option in q["choices"]:
@@ -94,19 +135,23 @@ class QuizWindow(tk.Toplevel):
                 text=option,
                 variable=self.selected_answer,
                 value=option,
-                bg="#111", fg="white",
+                bg="#111",
+                fg="white",
                 activebackground="#111",
                 activeforeground="#00FFFF",
                 selectcolor="#111",
                 font=("Segoe UI", 11),
-                anchor="w", justify="left", wraplength=700,
+                indicatoron=1,
+                anchor="w",
+                justify="left",
+                wraplength=700,
                 command=lambda opt=option: self.highlight_selected(opt)
             )
             rb.pack(fill="x", padx=20, pady=4)
             self.option_buttons.append(rb)
 
-        # reset culori după creare
-        self.after(10, lambda: [b.config(fg="white") for b in self.option_buttons])
+        # Asigură că niciun buton nu e vizual selectat la pornire
+        self.after(50, lambda: [rb.deselect() for rb in self.option_buttons])
 
     # ----------------------------------------------------------
     def show_question(self):
@@ -145,13 +190,10 @@ class QuizWindow(tk.Toplevel):
 
     # ----------------------------------------------------------
     def countdown(self):
-        """Rulează o singură dată per întrebare (thread separat)"""
         while self.running and self.time_left > 0:
             time.sleep(1)
             self.time_left -= 1
             self.update_timer_display()
-
-            # avertizare sonoră la 5 secunde
             if self.time_left == 5:
                 path = os.path.join(os.path.dirname(__file__), "alert.mp3")
                 if os.path.exists(path):
@@ -159,17 +201,13 @@ class QuizWindow(tk.Toplevel):
                         playsound(path, block=False)
                     except:
                         pass
-
-        # când timpul s-a terminat
         if self.running and self.time_left <= 0:
             self.running = False
             self.after(0, lambda: self.timer_label.config(text="Timp expirat!", fg="#FF5555"))
-            # adaugă o pauză vizuală de 1 sec înainte de întrebarea următoare
             self.after(1000, self.next_question)
 
     # ----------------------------------------------------------
     def update_timer_display(self):
-        """actualizează bara și label-ul fără să repornească threadul"""
         mins, secs = divmod(self.time_left, 60)
         self.timer_label.config(text=f"Timp rămas: {mins:02d}:{secs:02d}", fg="#00FFFF")
         if self.time_limit:
@@ -178,9 +216,7 @@ class QuizWindow(tk.Toplevel):
 
     # ----------------------------------------------------------
     def next_question(self):
-        # Oprire timer curent dacă s-a apăsat manual pe "Următoarea"
         self.running = False
-
         q = self.questions[self.current]
         user_ans = self.selected_answer.get()
         correct_ans = q["choices"][q["correct_index"]]
@@ -202,13 +238,8 @@ class QuizWindow(tk.Toplevel):
             )
 
         self.current += 1
-
-        if self.mode == "TRAIN":
-            # feedback + trece automat după 2.5s
-            self.after(2500, self.show_question)
-        elif self.mode == "EXAM":
-            # trece la următoarea întrebare (după feedback 1s, dacă e manual)
-            self.after(1000, self.show_question)
+        delay = 2500 if self.mode == "TRAIN" else 1000
+        self.after(delay, self.show_question)
 
     # ----------------------------------------------------------
     def end_quiz(self):
