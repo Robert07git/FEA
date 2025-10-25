@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk
 from data_loader import load_questions, get_domains
 from quiz_logic import QuizSession
 from progress_chart import show_progress_chart
@@ -11,7 +11,7 @@ class QuizApp:
     def __init__(self, root):
         self.root = root
         self.root.title("FEA Quiz Trainer")
-        self.root.geometry("800x600")
+        self.root.geometry("900x700")
         self.root.configure(bg="#111")
         self.root.resizable(False, False)
 
@@ -19,108 +19,191 @@ class QuizApp:
         if not self.domains:
             self.domains = ["structural", "crash", "moldflow", "cfd", "nvh", "mix"]
 
-        self.create_widgets()
+        self.session = None
+        self.create_main_menu()
 
-    def create_widgets(self):
+    # ===================== PAGINA PRINCIPALĂ =====================
+    def create_main_menu(self):
+        self.frame_main = tk.Frame(self.root, bg="#111")
+        self.frame_main.pack(fill="both", expand=True)
+
         tk.Label(
-            self.root,
-            text="FEA QUIZ TRAINER",
-            font=("Arial", 20, "bold"),
-            bg="#111",
-            fg="#00ffff"
-        ).pack(pady=20)
+            self.frame_main, text="FEA QUIZ TRAINER",
+            font=("Arial", 24, "bold"), fg="#00ffff", bg="#111"
+        ).pack(pady=30)
 
-        # Domeniu
-        tk.Label(self.root, text="Alege domeniul:", bg="#111", fg="white", font=("Arial", 12)).pack()
-        self.domain_var = tk.StringVar(value="mix")
-        domain_menu = ttk.Combobox(self.root, textvariable=self.domain_var, values=self.domains, state="readonly")
-        domain_menu.pack(pady=10)
+        tk.Label(self.frame_main, text="Alege domeniul:", bg="#111", fg="white", font=("Arial", 12)).pack()
+        self.domain_var = tk.StringVar(value=self.domains[0])
+        ttk.Combobox(
+            self.frame_main, textvariable=self.domain_var, values=self.domains, state="readonly", width=20
+        ).pack(pady=10)
 
-        # Număr întrebări
-        tk.Label(self.root, text="Număr întrebări:", bg="#111", fg="white", font=("Arial", 12)).pack()
+        tk.Label(self.frame_main, text="Număr întrebări:", bg="#111", fg="white", font=("Arial", 12)).pack()
         self.num_questions_var = tk.IntVar(value=5)
-        tk.Spinbox(self.root, from_=1, to=50, textvariable=self.num_questions_var, width=5).pack(pady=10)
+        tk.Spinbox(
+            self.frame_main, from_=1, to=50, textvariable=self.num_questions_var, width=5
+        ).pack(pady=10)
 
-        # Mod de testare
-        tk.Label(self.root, text="Mod de testare:", bg="#111", fg="white", font=("Arial", 12)).pack(pady=(10, 0))
+        tk.Label(self.frame_main, text="Mod de testare:", bg="#111", fg="white", font=("Arial", 12)).pack(pady=5)
         self.mode_var = tk.StringVar(value="train")
+        frame_modes = tk.Frame(self.frame_main, bg="#111")
+        frame_modes.pack()
 
-        frame_modes = tk.Frame(self.root, bg="#111")
-        frame_modes.pack(pady=5)
+        tk.Radiobutton(frame_modes, text="TRAIN", variable=self.mode_var, value="train",
+                       bg="#00aaaa", fg="white", selectcolor="#00cccc",
+                       indicatoron=0, width=10, font=("Arial", 11, "bold")).pack(side="left", padx=5)
 
-        self.train_btn = tk.Radiobutton(
-            frame_modes, text="TRAIN", variable=self.mode_var, value="train",
-            indicatoron=0, width=10, font=("Arial", 11, "bold"),
-            bg="#00aaaa", fg="white", selectcolor="#00cccc", activebackground="#00cccc",
-            command=self.toggle_exam_time
-        )
-        self.train_btn.pack(side="left", padx=10)
+        tk.Radiobutton(frame_modes, text="EXAM", variable=self.mode_var, value="exam",
+                       bg="#cc4444", fg="white", selectcolor="#ff5555",
+                       indicatoron=0, width=10, font=("Arial", 11, "bold")).pack(side="left", padx=5)
 
-        self.exam_btn = tk.Radiobutton(
-            frame_modes, text="EXAM", variable=self.mode_var, value="exam",
-            indicatoron=0, width=10, font=("Arial", 11, "bold"),
-            bg="#aa0000", fg="white", selectcolor="#ff3333", activebackground="#ff3333",
-            command=self.toggle_exam_time
-        )
-        self.exam_btn.pack(side="left", padx=10)
+        tk.Label(self.frame_main, text="Timp per întrebare (secunde):", bg="#111", fg="white", font=("Arial", 12)).pack(pady=5)
+        self.time_var = tk.IntVar(value=15)
+        tk.Spinbox(self.frame_main, from_=5, to=120, textvariable=self.time_var, width=5).pack(pady=10)
 
-        # Alegere timp (vizibil doar în modul EXAM)
-        self.exam_time_label = tk.Label(self.root, text="Timp per întrebare (secunde):", bg="#111", fg="white", font=("Arial", 12))
-        self.exam_time_spin = tk.Spinbox(self.root, from_=5, to=120, width=5)
-        self.exam_time_label.pack_forget()
-        self.exam_time_spin.pack_forget()
+        tk.Button(
+            self.frame_main, text="Start Quiz", command=self.start_quiz,
+            font=("Arial", 12, "bold"), bg="#00cccc", fg="#000", width=12
+        ).pack(pady=15)
 
-        # Buton START
-        start_btn = tk.Button(
-            self.root, text="Start Quiz", font=("Arial", 14, "bold"),
-            bg="#00ffcc", fg="black", command=self.start_quiz
-        )
-        start_btn.pack(pady=30)
+        frame_tools = tk.Frame(self.frame_main, bg="#111")
+        frame_tools.pack(pady=10)
 
-        # Alte butoane
-        extras_frame = tk.Frame(self.root, bg="#111")
-        extras_frame.pack(pady=15)
+        tk.Button(frame_tools, text="📊 Grafic progres", command=show_progress_chart,
+                  font=("Arial", 10), bg="#333", fg="white", width=14).pack(side="left", padx=5)
+        tk.Button(frame_tools, text="📝 Export PDF", command=export_quiz_pdf,
+                  font=("Arial", 10), bg="#333", fg="white", width=12).pack(side="left", padx=5)
+        tk.Button(frame_tools, text="📈 Statistici", command=show_dashboard,
+                  font=("Arial", 10), bg="#333", fg="white", width=12).pack(side="left", padx=5)
 
-        tk.Button(extras_frame, text="Statistici 📊", font=("Arial", 11),
-                  bg="#222", fg="white", command=show_dashboard).pack(side="left", padx=5)
-        tk.Button(extras_frame, text="Grafic progres 📈", font=("Arial", 11),
-                  bg="#222", fg="white", command=show_progress_chart).pack(side="left", padx=5)
-        tk.Button(extras_frame, text="Export PDF 📝", font=("Arial", 11),
-                  bg="#222", fg="white", command=export_quiz_pdf).pack(side="left", padx=5)
-
-    def toggle_exam_time(self):
-        """Afișează câmpul pentru timp doar când e selectat modul EXAM"""
-        if self.mode_var.get() == "exam":
-            self.exam_time_label.pack()
-            self.exam_time_spin.pack(pady=5)
-        else:
-            self.exam_time_label.pack_forget()
-            self.exam_time_spin.pack_forget()
-
+    # ===================== PORNIRE QUIZ =====================
     def start_quiz(self):
         domain = self.domain_var.get()
+        num_q = self.num_questions_var.get()
         mode = self.mode_var.get()
-        num_questions = self.num_questions_var.get()
+        time_limit = self.time_var.get() if mode == "exam" else None
 
         questions = load_questions(domain)
         if not questions:
-            messagebox.showerror("Eroare", f"Nu există întrebări pentru domeniul '{domain}'.")
             return
 
-        time_limit = None
-        if mode == "exam":
-            time_limit = int(self.exam_time_spin.get())
+        self.frame_main.pack_forget()
+        self.session = QuizSession(self, questions[:num_q], mode, time_limit)
+        self.create_quiz_frame()
 
-        # Fereastră nouă pentru sesiunea de quiz
-        quiz_window = tk.Toplevel(self.root)
-        quiz_window.title(f"FEA Quiz Session - {domain.upper()}")
-        quiz_window.geometry("900x600")
-        quiz_window.configure(bg="#111")
+    # ===================== FRAME QUIZ =====================
+    def create_quiz_frame(self):
+        self.frame_quiz = tk.Frame(self.root, bg="#111")
+        self.frame_quiz.pack(fill="both", expand=True)
 
-        QuizSession(quiz_window, questions, num_questions, mode, time_limit)
+        self.lbl_question = tk.Label(
+            self.frame_quiz, text="", font=("Arial", 14, "bold"),
+            wraplength=800, justify="center", bg="#111", fg="white"
+        )
+        self.lbl_question.pack(pady=30)
+
+        self.options_var = tk.IntVar(value=-1)
+        self.option_buttons = []
+        for i in range(4):
+            btn = tk.Radiobutton(
+                self.frame_quiz, variable=self.options_var, value=i, text="",
+                font=("Arial", 12), bg="#111", fg="white",
+                activebackground="#111", selectcolor="#00cccc", wraplength=800, justify="left"
+            )
+            btn.pack(anchor="w", padx=120, pady=3)
+            self.option_buttons.append(btn)
+
+        self.lbl_feedback = tk.Label(
+            self.frame_quiz, text="", font=("Arial", 12), bg="#111", fg="white", wraplength=800, justify="center"
+        )
+        self.lbl_feedback.pack(pady=15)
+
+        self.btn_next = tk.Button(
+            self.frame_quiz, text="Următoarea ➜", command=self.submit_answer,
+            font=("Arial", 12, "bold"), bg="#00cccc", fg="#000"
+        )
+        self.btn_next.pack(pady=10)
+
+        self.btn_back = tk.Button(
+            self.frame_quiz, text="⟵ Înapoi la meniu", command=self.show_main_menu,
+            font=("Arial", 10), bg="#333", fg="white"
+        )
+        self.btn_back.pack(side="bottom", pady=10)
+
+        self.show_question()
+
+    def show_question(self):
+        question = self.session.current_question()
+        if not question:
+            return
+
+        self.lbl_feedback.config(text="")
+        self.options_var.set(-1)
+
+        self.lbl_question.config(
+            text=f"Întrebarea {self.session.index + 1}/{len(self.session.questions)}:\n\n{question['question']}"
+        )
+
+        for i, choice in enumerate(question["choices"]):
+            self.option_buttons[i].config(text=choice)
+
+    def submit_answer(self):
+        selected = self.options_var.get()
+        if selected == -1:
+            return
+        self.session.answer(selected)
+
+    def show_train_feedback(self, correct, correct_answer, explanation):
+        if correct:
+            text = f"✅ Corect!\n{explanation}"
+            color = "#00ff88"
+        else:
+            text = f"❌ Greșit!\nRăspuns corect: {correct_answer}\n{explanation}"
+            color = "#ff4444"
+
+        self.lbl_feedback.config(text=text, fg=color)
+        self.btn_next.config(text="Continuă ➜", command=self.session.next_question)
+
+    # ===================== FINAL EXAM =====================
+    def show_exam_summary(self, results, score, total, pct, duration):
+        self.frame_quiz.pack_forget()
+        frame_summary = tk.Frame(self.root, bg="#111")
+        frame_summary.pack(fill="both", expand=True)
+
+        tk.Label(
+            frame_summary, text="Rezultate EXAM", font=("Arial", 20, "bold"),
+            fg="#00ffff", bg="#111"
+        ).pack(pady=20)
+
+        tk.Label(
+            frame_summary, text=f"Scor final: {score}/{total} ({pct:.1f}%)\nTimp total: {duration:.1f}s",
+            font=("Arial", 13), fg="white", bg="#111"
+        ).pack(pady=10)
+
+        wrong = [r for r in results if not r["correct"]]
+        if not wrong:
+            tk.Label(frame_summary, text="Ai răspuns corect la toate întrebările! 🎉",
+                     font=("Arial", 12), fg="#00ff88", bg="#111").pack(pady=10)
+        else:
+            tk.Label(frame_summary, text="Întrebări greșite:", font=("Arial", 14, "bold"),
+                     fg="#ff6666", bg="#111").pack(pady=5)
+            text_box = tk.Text(frame_summary, height=15, width=100, bg="#222", fg="white", wrap="word")
+            text_box.pack(pady=10)
+            for r in wrong:
+                text_box.insert("end", f"- {r['question']}\nRăspuns corect: {r['choices'][r['correct_index']]}\nExplicație: {r['explanation']}\n\n")
+            text_box.config(state="disabled")
+
+        tk.Button(
+            frame_summary, text="⟵ Înapoi la meniu", command=self.show_main_menu,
+            font=("Arial", 12), bg="#00cccc", fg="black"
+        ).pack(pady=20)
+
+    def show_main_menu(self):
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        self.create_main_menu()
 
 
-# === Pornirea aplicației ===
 if __name__ == "__main__":
     root = tk.Tk()
     app = QuizApp(root)
