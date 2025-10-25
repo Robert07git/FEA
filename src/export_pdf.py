@@ -1,79 +1,82 @@
-from fpdf import FPDF
 import os
+from fpdf import FPDF
 from datetime import datetime
 
 
-class PDFReport(FPDF):
-    def header(self):
-        # Titlu header
-        self.set_font("Arial", "B", 14)
-        self.set_text_color(0, 255, 255)
-        self.cell(0, 10, "FEA Quiz Report", ln=True, align="C")
-        self.set_text_color(0, 0, 0)
-        self.ln(5)
-
-    def footer(self):
-        # Footer cu pagină
-        self.set_y(-15)
-        self.set_font("Arial", "I", 8)
-        self.set_text_color(150, 150, 150)
-        self.cell(0, 10, f"Pagina {self.page_no()}", 0, 0, "C")
-
-
-def generate_pdf_report(domain, mode, score, total, percent, results):
+def export_quiz_pdf():
     """
-    Creează un fișier PDF cu rezultatele quiz-ului.
-    Include detalii despre întrebări greșite și explicații.
+    Generează un raport PDF cu istoricul scorurilor din score_history.txt.
+    Salvează fișierul în folderul 'reports'.
     """
-    pdf = PDFReport()
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    history_path = os.path.join(base_dir, "score_history.txt")
+    reports_dir = os.path.join(base_dir, "reports")
+
+    if not os.path.exists(history_path):
+        print("[INFO] Nu există score_history.txt — rulează măcar un quiz.")
+        return
+
+    if not os.path.exists(reports_dir):
+        os.makedirs(reports_dir)
+
+    lines = []
+    with open(history_path, "r", encoding="utf-8") as f:
+        lines = [l.strip() for l in f.readlines() if l.strip()]
+
+    if not lines:
+        print("[INFO] Fișierul score_history.txt este gol.")
+        return
+
+    pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    pdf.set_font("Arial", "B", 16)
-    pdf.set_text_color(0, 200, 255)
-    pdf.cell(0, 10, "Rezultate sesiune FEA Quiz", ln=True, align="C")
+    # Titlu mare
+    pdf.set_font("Arial", "B", 18)
+    pdf.set_text_color(0, 255, 255)
+    pdf.cell(0, 10, "FEA Quiz - Raport Rezultate", ln=True, align="C")
     pdf.ln(10)
 
-    pdf.set_text_color(0, 0, 0)
+    # Data generării
     pdf.set_font("Arial", "", 12)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    pdf.cell(0, 10, f"Data: {timestamp}", ln=True)
-    pdf.cell(0, 10, f"Domeniu: {domain}", ln=True)
-    pdf.cell(0, 10, f"Mod: {mode}", ln=True)
-    pdf.cell(0, 10, f"Scor final: {score}/{total} ({percent:.1f}%)", ln=True)
-    pdf.ln(10)
-
-    pdf.set_font("Arial", "B", 13)
-    pdf.set_text_color(0, 102, 204)
-    pdf.cell(0, 10, "Întrebări incorecte / Explicații:", ln=True)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_fill_color(20, 20, 20)
+    pdf.cell(0, 10, f"Generat la: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
     pdf.ln(5)
 
-    incorrect = [r for r in results if not r["correct"]]
+    pdf.set_font("Arial", "B", 14)
+    pdf.set_text_color(0, 255, 100)
+    pdf.cell(0, 10, "Istoric performanță:", ln=True)
+    pdf.ln(5)
 
-    if not incorrect:
-        pdf.set_text_color(0, 150, 0)
-        pdf.cell(0, 10, "Ai răspuns corect la toate întrebările! Excelent!", ln=True)
-    else:
-        pdf.set_text_color(0, 0, 0)
-        for r in incorrect:
-            q = r["question"]
-            correct = r["choices"][r["correct_index"]]
-            explanation = r.get("explanation", "")
-            pdf.multi_cell(0, 8, f"• {q}", align="L")
-            pdf.set_text_color(255, 0, 0)
-            pdf.cell(0, 8, f"   Răspuns corect: {correct}", ln=True)
-            pdf.set_text_color(50, 50, 50)
-            pdf.multi_cell(0, 8, f"   Explicație: {explanation}", align="L")
-            pdf.ln(5)
-            pdf.set_text_color(0, 0, 0)
+    # Fundal gri închis
+    pdf.set_fill_color(30, 30, 30)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Arial", "", 11)
 
-    # Salvare fișier
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    reports_dir = os.path.join(base_dir, "reports")
-    os.makedirs(reports_dir, exist_ok=True)
+    for line in lines[-20:]:  # ultimele 20 sesiuni
+        pdf.multi_cell(0, 8, line, border=0, align="L", fill=True)
+        pdf.ln(1)
 
-    filename = f"FEA_Report_{domain}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    pdf_path = os.path.join(reports_dir, filename)
-    pdf.output(pdf_path)
+    pdf.ln(10)
+    pdf.set_font("Arial", "B", 12)
+    pdf.set_text_color(255, 255, 0)
+    pdf.cell(0, 10, "Interpretare:", ln=True)
+    pdf.set_font("Arial", "", 11)
+    pdf.set_text_color(255, 255, 255)
+    pdf.multi_cell(0, 8,
+        "Rezultatele de mai sus reflectă evoluția ta în timp. "
+        "Încearcă să crești consistența peste 80% în modul EXAM. "
+        "Pentru o învățare eficientă, analizează domeniile cu scor scăzut."
+    )
 
-    return pdf_path
+    pdf.ln(10)
+    pdf.set_font("Arial", "I", 10)
+    pdf.set_text_color(180, 180, 180)
+    pdf.cell(0, 8, "FEA Quiz Trainer © 2025 — Mechanical Engineer Edition", ln=True, align="C")
+
+    filename = f"FEA_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    output_path = os.path.join(reports_dir, filename)
+    pdf.output(output_path)
+
+    print(f"[OK] Raport PDF generat cu succes: {output_path}")
