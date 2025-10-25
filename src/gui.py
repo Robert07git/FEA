@@ -5,6 +5,7 @@ from quiz_logic import QuizSession
 from progress_chart import show_progress_chart
 from export_pdf import export_quiz_pdf
 from stats import show_dashboard
+import time
 
 
 class QuizApp:
@@ -20,6 +21,9 @@ class QuizApp:
             self.domains = ["structural", "crash", "moldflow", "cfd", "nvh", "mix"]
 
         self.session = None
+        self.time_left = 0
+        self.timer_running = False
+
         self.create_main_menu()
 
     # ===================== PAGINA PRINCIPALĂ =====================
@@ -102,6 +106,10 @@ class QuizApp:
         )
         self.lbl_question.pack(pady=30)
 
+        # Timer și bară de progres
+        self.progress_bar = ttk.Progressbar(self.frame_quiz, length=400, mode="determinate")
+        self.timer_label = tk.Label(self.frame_quiz, text="", bg="#111", fg="#00ffff", font=("Arial", 11, "bold"))
+
         self.options_var = tk.IntVar(value=-1)
         self.option_buttons = []
         for i in range(4):
@@ -137,8 +145,11 @@ class QuizApp:
         if not question:
             return
 
+        # Resetare feedback și selecții
         self.lbl_feedback.config(text="")
         self.options_var.set(-1)
+        for btn in self.option_buttons:
+            btn.deselect()
 
         self.lbl_question.config(
             text=f"Întrebarea {self.session.index + 1}/{len(self.session.questions)}:\n\n{question['question']}"
@@ -147,6 +158,36 @@ class QuizApp:
         for i, choice in enumerate(question["choices"]):
             self.option_buttons[i].config(text=choice)
 
+        # Dacă e EXAM, pornește timerul
+        if self.session.mode == "exam" and self.session.time_limit:
+            self.progress_bar.pack(pady=5)
+            self.timer_label.pack()
+            self.start_timer(self.session.time_limit)
+        else:
+            self.progress_bar.pack_forget()
+            self.timer_label.pack_forget()
+
+    # ===================== TIMER =====================
+    def start_timer(self, seconds):
+        self.time_left = seconds
+        self.progress_bar["maximum"] = seconds
+        self.progress_bar["value"] = seconds
+        self.timer_running = True
+        self.update_timer()
+
+    def update_timer(self):
+        if not self.timer_running:
+            return
+        if self.time_left <= 0:
+            self.timer_running = False
+            self.session.next_question()
+            return
+        self.timer_label.config(text=f"Timp rămas: {self.time_left}s")
+        self.progress_bar["value"] = self.time_left
+        self.time_left -= 1
+        self.root.after(1000, self.update_timer)
+
+    # ===================== FEEDBACK TRAIN =====================
     def submit_answer(self):
         selected = self.options_var.get()
         if selected == -1:
@@ -198,7 +239,9 @@ class QuizApp:
             font=("Arial", 12), bg="#00cccc", fg="black"
         ).pack(pady=20)
 
+    # ===================== ÎNAPOI LA MENIU =====================
     def show_main_menu(self):
+        self.timer_running = False
         for widget in self.root.winfo_children():
             widget.destroy()
         self.create_main_menu()
