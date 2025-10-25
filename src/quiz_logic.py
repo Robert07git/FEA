@@ -18,7 +18,7 @@ class QuizWindow(tk.Toplevel):
         self.time_limit = time_limit
         self.current = 0
         self.score = 0
-        self.selected_answer = tk.StringVar()
+        self.selected_answer = tk.StringVar(value="")  # corect: inițializare sigură
         self.running = True
         self.timer_thread = None
         self.time_left = time_limit if time_limit else 0
@@ -56,7 +56,7 @@ class QuizWindow(tk.Toplevel):
         )
         self.timer_label.pack(pady=5)
 
-        # bară de progres
+        # bară de progres timp
         self.progress_frame = tk.Frame(self, bg="#222", width=400, height=20)
         self.progress_frame.pack(pady=5)
         self.progress_frame.pack_propagate(False)
@@ -73,34 +73,37 @@ class QuizWindow(tk.Toplevel):
     # ------------------------------------------------------------
 
     def show_question(self):
+        """Afișează întrebarea curentă"""
         if self.current >= len(self.questions):
             self.end_quiz()
             return
 
         q = self.questions[self.current]
-        self.selected_answer.set("")
+        self.selected_answer.set("")  # reset răspuns curent
 
         self.label_qnum.config(
             text=f"Întrebarea {self.current + 1}/{len(self.questions)}:"
         )
         self.label_question.config(text=q["question"])
 
+        # Curățăm opțiunile vechi
         for widget in self.options_frame.winfo_children():
             widget.destroy()
 
-        # Folosim 'choices' conform JSON-ului tău
+        # Adăugăm opțiuni — doar una selectabilă
         for i, option in enumerate(q["choices"]):
-            tk.Radiobutton(
+            rb = tk.Radiobutton(
                 self.options_frame,
                 text=option,
                 variable=self.selected_answer,
                 value=option,
                 bg="#111", fg="white",
                 activebackground="#00FFFF", activeforeground="black",
-                selectcolor="#00FFFF",
+                selectcolor="#111",  # fundal neutru
                 font=("Segoe UI", 11),
                 anchor="w", justify="left", wraplength=700
-            ).pack(fill="x", padx=20, pady=4)
+            )
+            rb.pack(fill="x", padx=20, pady=4)
 
         # Resetăm timerul pentru fiecare întrebare în EXAM
         if self.mode == "EXAM" and self.time_limit:
@@ -119,11 +122,12 @@ class QuizWindow(tk.Toplevel):
     # ------------------------------------------------------------
 
     def countdown(self):
+        """Cronometru + bară progresivă"""
         while self.running and self.time_left > 0:
             mins, secs = divmod(self.time_left, 60)
             self.timer_label.config(text=f"Timp rămas: {mins:02d}:{secs:02d}")
 
-            # Bara de progres se micșorează proporțional cu timpul
+            # Bara de progres se micșorează
             bar_width = int((self.time_left / self.time_limit) * 400)
             self.progress_bar.config(width=bar_width)
 
@@ -137,16 +141,17 @@ class QuizWindow(tk.Toplevel):
                     try:
                         playsound(sound_path, block=False)
                     except Exception:
-                        pass
+                        pass  # ignorăm erorile audio
 
         if self.running and self.time_left <= 0:
-            self.timer_label.config(text="Timp expirat!")
+            self.timer_label.config(text="Timp expirat!", fg="cyan")
             self.progress_bar.config(width=0)
             self.after(1000, self.next_question)
 
     # ------------------------------------------------------------
 
     def next_question(self):
+        """Verifică răspunsul și trece la următoarea întrebare"""
         if not self.running:
             return
         self.running = False  # oprim timerul curent
@@ -171,6 +176,7 @@ class QuizWindow(tk.Toplevel):
     # ------------------------------------------------------------
 
     def end_quiz(self):
+        """Afișează rezultatul final"""
         self.running = False
         for widget in self.winfo_children():
             widget.destroy()
