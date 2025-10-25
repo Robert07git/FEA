@@ -1,82 +1,67 @@
 import os
-from fpdf import FPDF
-from datetime import datetime
+from collections import defaultdict
 
 
-def export_quiz_pdf():
+def show_dashboard():
     """
-    Generează un raport PDF cu istoricul scorurilor din score_history.txt.
-    Salvează fișierul în folderul 'reports'.
+    Citește istoricul din score_history.txt și afișează statistici utile:
+    - media generală
+    - cele mai frecvente domenii
+    - scorul maxim și minim
+    - număr total de sesiuni
     """
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     history_path = os.path.join(base_dir, "score_history.txt")
-    reports_dir = os.path.join(base_dir, "reports")
 
     if not os.path.exists(history_path):
-        print("[INFO] Nu există score_history.txt — rulează măcar un quiz.")
+        print("\n[INFO] Nu există fișier score_history.txt. Rulează un quiz mai întâi.")
         return
 
-    if not os.path.exists(reports_dir):
-        os.makedirs(reports_dir)
+    domenii_stats = defaultdict(list)
 
-    lines = []
     with open(history_path, "r", encoding="utf-8") as f:
         lines = [l.strip() for l in f.readlines() if l.strip()]
 
     if not lines:
-        print("[INFO] Fișierul score_history.txt este gol.")
+        print("\n[INFO] Fișierul score_history.txt este gol.")
         return
 
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
+    for line in lines:
+        parts = [p.strip() for p in line.split("|") if p.strip()]
+        if len(parts) < 5:
+            continue
+        try:
+            domeniu = parts[1].split("=")[1].strip()
+            pct_text = parts[4].split("=")[1].replace("%", "").strip()
+            pct = float(pct_text)
+            domenii_stats[domeniu].append(pct)
+        except Exception:
+            continue
 
-    # Titlu mare
-    pdf.set_font("Arial", "B", 18)
-    pdf.set_text_color(0, 255, 255)
-    pdf.cell(0, 10, "FEA Quiz - Raport Rezultate", ln=True, align="C")
-    pdf.ln(10)
+    total_sesiuni = sum(len(v) for v in domenii_stats.values())
+    scoruri_totale = [v for lst in domenii_stats.values() for v in lst]
+    medie_globala = sum(scoruri_totale) / len(scoruri_totale) if scoruri_totale else 0
 
-    # Data generării
-    pdf.set_font("Arial", "", 12)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_fill_color(20, 20, 20)
-    pdf.cell(0, 10, f"Generat la: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
-    pdf.ln(5)
+    print("\n=== DASHBOARD FEA QUIZ ===")
+    print(f"Total sesiuni efectuate: {total_sesiuni}")
+    print(f"Scor mediu global: {medie_globala:.1f}%")
 
-    pdf.set_font("Arial", "B", 14)
-    pdf.set_text_color(0, 255, 100)
-    pdf.cell(0, 10, "Istoric performanță:", ln=True)
-    pdf.ln(5)
+    print("\nPerformanță pe domenii:")
+    for d, scoruri in domenii_stats.items():
+        medie = sum(scoruri) / len(scoruri)
+        max_score = max(scoruri)
+        min_score = min(scoruri)
+        print(f"  • {d:<10} -> Medie: {medie:.1f}% | Max: {max_score:.1f}% | Min: {min_score:.1f}% | Sesiuni: {len(scoruri)}")
 
-    # Fundal gri închis
-    pdf.set_fill_color(30, 30, 30)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Arial", "", 11)
+    best_domain = max(domenii_stats, key=lambda d: sum(domenii_stats[d]) / len(domenii_stats[d]))
+    worst_domain = min(domenii_stats, key=lambda d: sum(domenii_stats[d]) / len(domenii_stats[d]))
+    print("\nCel mai bun domeniu:", best_domain)
+    print("Domeniul ce necesită îmbunătățire:", worst_domain)
 
-    for line in lines[-20:]:  # ultimele 20 sesiuni
-        pdf.multi_cell(0, 8, line, border=0, align="L", fill=True)
-        pdf.ln(1)
-
-    pdf.ln(10)
-    pdf.set_font("Arial", "B", 12)
-    pdf.set_text_color(255, 255, 0)
-    pdf.cell(0, 10, "Interpretare:", ln=True)
-    pdf.set_font("Arial", "", 11)
-    pdf.set_text_color(255, 255, 255)
-    pdf.multi_cell(0, 8,
-        "Rezultatele de mai sus reflectă evoluția ta în timp. "
-        "Încearcă să crești consistența peste 80% în modul EXAM. "
-        "Pentru o învățare eficientă, analizează domeniile cu scor scăzut."
-    )
-
-    pdf.ln(10)
-    pdf.set_font("Arial", "I", 10)
-    pdf.set_text_color(180, 180, 180)
-    pdf.cell(0, 8, "FEA Quiz Trainer © 2025 — Mechanical Engineer Edition", ln=True, align="C")
-
-    filename = f"FEA_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    output_path = os.path.join(reports_dir, filename)
-    pdf.output(output_path)
-
-    print(f"[OK] Raport PDF generat cu succes: {output_path}")
+    print("\nSugestie:")
+    if medie_globala >= 85:
+        print("🏆 Excelent! Ești aproape pregătit pentru interviuri CAE.")
+    elif medie_globala >= 65:
+        print("📈 Foarte bine! Lucrează la consistență în domeniile mai slabe.")
+    else:
+        print("💡 Mai exersează. Concentrează-te pe conceptele de bază și recitește explicațiile din modul TRAIN.")
