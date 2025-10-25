@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 import json
 import random
 import os
+import time
 from fpdf import FPDF
 from quiz_logic import QuizWindow
 from stats import show_stats
@@ -32,25 +33,28 @@ class FEATrainerApp(tk.Tk):
         self.num_questions = tk.Spinbox(self, from_=1, to=20, width=5)
         self.num_questions.pack(pady=5)
 
-        # Mod selecție clară (TRAIN / EXAM)
+        # Mod clar vizibil (butoane personalizate)
         tk.Label(self, text="Mod:", font=("Segoe UI", 12), bg="#111", fg="white").pack(pady=5)
         self.mode_var = tk.StringVar(value="TRAIN")
 
-        train_rb = tk.Radiobutton(
-            self, text="TRAIN (feedback imediat)", variable=self.mode_var, value="TRAIN",
-            font=("Segoe UI", 11), bg="#111", fg="white",
-            activebackground="#00FFFF", activeforeground="black",
-            selectcolor="#00FFFF", highlightthickness=0, relief="flat", indicatoron=True
-        )
-        train_rb.pack(anchor="center", pady=2)
+        def set_mode(mode):
+            self.mode_var.set(mode)
+            train_btn.config(bg="#00FFFF" if mode == "TRAIN" else "#222", fg="black" if mode == "TRAIN" else "white")
+            exam_btn.config(bg="#00FFFF" if mode == "EXAM" else "#222", fg="black" if mode == "EXAM" else "white")
 
-        exam_rb = tk.Radiobutton(
-            self, text="EXAM (limită timp, feedback final)", variable=self.mode_var, value="EXAM",
-            font=("Segoe UI", 11), bg="#111", fg="white",
-            activebackground="#00FFFF", activeforeground="black",
-            selectcolor="#00FFFF", highlightthickness=0, relief="flat", indicatoron=True
+        train_btn = tk.Button(
+            self, text="TRAIN (feedback imediat)", command=lambda: set_mode("TRAIN"),
+            bg="#00FFFF", fg="black", font=("Segoe UI", 11, "bold"),
+            relief="flat", width=30, pady=4
         )
-        exam_rb.pack(anchor="center", pady=2)
+        train_btn.pack(pady=3)
+
+        exam_btn = tk.Button(
+            self, text="EXAM (limită timp, feedback final)", command=lambda: set_mode("EXAM"),
+            bg="#222", fg="white", font=("Segoe UI", 11, "bold"),
+            relief="flat", width=30, pady=4
+        )
+        exam_btn.pack(pady=3)
 
         # Timp per întrebare
         tk.Label(
@@ -102,9 +106,12 @@ class FEATrainerApp(tk.Tk):
         num = int(self.num_questions.get())
         tlim = int(self.time_per_q.get()) if mode == "EXAM" else None
 
-        file_path = os.path.join(os.path.dirname(__file__), "fea_questions.json")
+        # CAUTĂ FEIȘIERUL ÎN FOLDERUL DATA/
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        file_path = os.path.join(base_dir, "data", "fea_questions.json")
+
         if not os.path.exists(file_path):
-            messagebox.showerror("Eroare", "Fișierul fea_questions.json nu a fost găsit!")
+            messagebox.showerror("Eroare", "Fișierul fea_questions.json nu a fost găsit în folderul /data!")
             return
 
         with open(file_path, "r", encoding="utf-8") as f:
@@ -125,7 +132,6 @@ class FEATrainerApp(tk.Tk):
         if not os.path.exists(history_file):
             messagebox.showinfo("Info", "Nu există încă rezultate salvate.")
             return
-
         os.startfile(history_file)
 
     # ------------------------------------------------------
@@ -150,8 +156,10 @@ class FEATrainerApp(tk.Tk):
         pdf.ln(10)
         with open(history_file, "r", encoding="utf-8") as f:
             for line in f:
-                domain, mode, total, score = line.strip().split(",")
-                pdf.cell(0, 10, txt=f"Domeniu: {domain} | Mod: {mode} | Întrebări: {total} | Scor: {score}%", ln=True)
+                parts = line.strip().split(",")
+                if len(parts) == 4:
+                    domain, mode, total, score = parts
+                    pdf.cell(0, 10, txt=f"Domeniu: {domain} | Mod: {mode} | Întrebări: {total} | Scor: {score}%", ln=True)
 
         try:
             pdf.output(pdf_path)
