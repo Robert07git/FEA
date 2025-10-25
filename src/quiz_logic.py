@@ -22,15 +22,14 @@ class QuizWindow(tk.Toplevel):
         self.timer_thread = None
         self.time_left = time_limit if time_limit else 0
         self.selected_answer = tk.StringVar(value="")
+        self.option_buttons = []
 
-        # Elemente UI
         self.create_widgets()
         self.show_question()
 
     # ----------------------------------------------------------
     def create_widgets(self):
         """Creează interfața principală"""
-
         tk.Label(
             self, text="FEA Quiz", font=("Segoe UI", 20, "bold"),
             bg="#111", fg="#00FFFF"
@@ -100,25 +99,27 @@ class QuizWindow(tk.Toplevel):
 
         q = self.questions[self.current]
 
-        # Resetăm variabila și eliminăm complet opțiunile anterioare
-        self.selected_answer = tk.StringVar(value="")
+        # Reset complet
         for widget in self.options_frame.winfo_children():
             widget.destroy()
 
-        # Actualizare progres întrebări
+        self.selected_answer = tk.StringVar(value="")
+        self.option_buttons.clear()
+
+        # Actualizare progres
         total = len(self.questions)
         progress_percent = int((self.current / total) * 100)
         self.progress_label.config(text=f"Progres: {progress_percent}%")
         self.progress_questions_bar.config(width=int((self.current / total) * 400))
 
-        # Actualizare întrebare
+        # Text întrebare
         self.label_qnum.config(
             text=f"Întrebarea {self.current + 1}/{len(self.questions)}:"
         )
         self.label_question.config(text=q["question"])
 
-        # Creăm butoanele radio din nou
-        for i, option in enumerate(q["choices"]):
+        # Creăm butoane cu efect vizual
+        for option in q["choices"]:
             rb = tk.Radiobutton(
                 self.options_frame,
                 text=option,
@@ -126,12 +127,13 @@ class QuizWindow(tk.Toplevel):
                 value=option,
                 bg="#111", fg="white",
                 activebackground="#111", activeforeground="#00FFFF",
-                indicatoron=True,
-                selectcolor="#111",
+                indicatoron=True, selectcolor="#111",
                 font=("Segoe UI", 11),
-                anchor="w", justify="left", wraplength=700
+                anchor="w", justify="left", wraplength=700,
+                command=lambda opt=option: self.highlight_selected(opt)
             )
             rb.pack(fill="x", padx=20, pady=4)
+            self.option_buttons.append(rb)
 
         # Timer pentru EXAM
         if self.mode == "EXAM" and self.time_limit:
@@ -147,15 +149,22 @@ class QuizWindow(tk.Toplevel):
             self.progress_bar.config(width=0)
 
     # ----------------------------------------------------------
+    def highlight_selected(self, selected_option):
+        """Schimbă culoarea textului pentru opțiunea selectată"""
+        for rb in self.option_buttons:
+            if rb["text"] == selected_option:
+                rb.config(fg="#00FFFF")  # turcoaz pentru selectat
+            else:
+                rb.config(fg="white")  # alb pentru celelalte
+
+    # ----------------------------------------------------------
     def countdown(self):
-        """Cronometru"""
+        """Cronometru pentru EXAM"""
         while self.running and self.time_left > 0:
             mins, secs = divmod(self.time_left, 60)
             self.timer_label.config(text=f"Timp rămas: {mins:02d}:{secs:02d}")
-
             bar_width = int((self.time_left / self.time_limit) * 400)
             self.progress_bar.config(width=bar_width)
-
             time.sleep(1)
             self.time_left -= 1
 
@@ -190,7 +199,9 @@ class QuizWindow(tk.Toplevel):
                 messagebox.showinfo("Corect ✅", "Răspuns corect!\n\n" + explanation)
         else:
             if self.mode == "TRAIN":
-                messagebox.showerror("Greșit ❌", f"Răspuns greșit!\nCorect era: {correct_answer}\n\n{explanation}")
+                messagebox.showerror(
+                    "Greșit ❌", f"Răspuns greșit!\nCorect era: {correct_answer}\n\n{explanation}"
+                )
 
         self.current += 1
         self.show_question()
@@ -199,7 +210,6 @@ class QuizWindow(tk.Toplevel):
     def end_quiz(self):
         """Afișează rezultatele finale"""
         self.running = False
-
         for widget in self.winfo_children():
             widget.destroy()
 
