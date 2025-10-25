@@ -4,50 +4,81 @@ from datetime import datetime
 
 
 def show_progress_chart():
-    """
-    Creează un grafic al scorurilor înregistrate în score_history.txt.
-    Arată progresul în timp și media totală.
-    """
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     history_path = os.path.join(base_dir, "score_history.txt")
 
     if not os.path.exists(history_path):
-        print("[INFO] Nu există fișier score_history.txt. Rulează mai întâi un quiz.")
+        print("⚠️ Nu există fișier score_history.txt. Fă cel puțin un quiz mai întâi.")
         return
 
-    timestamps, scores = [], []
+    try:
+        timestamps, scores, domains, modes = [], [], [], []
 
-    with open(history_path, "r", encoding="utf-8") as f:
-        for line in f:
-            parts = line.strip().split("|")
-            if len(parts) < 5:
+        with open(history_path, "r", encoding="utf-8") as f:
+            lines = [line.strip() for line in f.readlines() if line.strip()]
+
+        for line in lines:
+            parts = line.split("|")
+            if len(parts) < 4:
                 continue
+
+            # extrage data
+            timestamp = parts[0].split()[0].strip()
             try:
-                ts = parts[0].strip()
-                score_part = parts[3].split("=")[1].strip() if "=" in parts[3] else parts[3].strip()
-                pct_part = parts[4].split("=")[1].replace("%", "").strip() if "=" in parts[4] else None
-
-                if pct_part:
-                    timestamps.append(datetime.strptime(ts, "%Y-%m-%d %H:%M"))
-                    scores.append(float(pct_part))
-            except Exception:
+                timestamps.append(datetime.strptime(timestamp, "%Y-%m-%d"))
+            except:
                 continue
 
-    if not scores:
-        print("[INFO] Nu există date valide în score_history.txt.")
-        return
+            # domeniu
+            dom = parts[1].replace("domeniu=", "").strip()
+            domains.append(dom)
 
-    plt.figure(figsize=(9, 5))
-    plt.plot(timestamps, scores, marker="o", color="#00ffff", linewidth=2, label="Procentaj (%)")
-    plt.title("Evoluția performanței la FEA Quiz", fontsize=14, weight="bold")
-    plt.xlabel("Dată")
-    plt.ylabel("Scor (%)")
-    plt.grid(True, linestyle="--", alpha=0.5)
-    plt.xticks(rotation=30)
-    plt.ylim(0, 100)
+            # mod (TRAIN / EXAM)
+            mod = parts[2].replace("mod=", "").strip()
+            modes.append(mod)
 
-    avg_score = sum(scores) / len(scores)
-    plt.axhline(avg_score, color="orange", linestyle="--", label=f"Medie: {avg_score:.1f}%")
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+            # scor
+            try:
+                score_str = parts[3].split("=")[-1].split("/")[0].strip()
+                total_str = parts[3].split("/")[-1].split()[0].strip()
+                score = int(score_str)
+                total = int(total_str)
+                pct = (score / total) * 100 if total > 0 else 0
+                scores.append(pct)
+            except:
+                scores.append(0)
+
+        # dacă lipsesc date, ieșim
+        if not timestamps or not scores:
+            print("⚠️ Nu s-au putut extrage date valide din score_history.txt.")
+            return
+
+        # asigură că listele au aceeași lungime
+        min_len = min(len(timestamps), len(scores))
+        timestamps = timestamps[:min_len]
+        scores = scores[:min_len]
+        domains = domains[:min_len]
+        modes = modes[:min_len]
+
+        plt.figure(figsize=(10, 5))
+        plt.plot(timestamps, scores, marker="o", linestyle="-", color="#00ffff", label="Procentaj corectitudine")
+        plt.title("Evoluția scorului în timp - FEA Quiz Trainer", fontsize=14, color="#00ffff")
+        plt.xlabel("Data", fontsize=12, color="white")
+        plt.ylabel("Scor (%)", fontsize=12, color="white")
+        plt.grid(True, linestyle="--", alpha=0.4)
+        plt.ylim(0, 105)
+        plt.legend()
+        plt.tight_layout()
+
+        # culoare fundal negru
+        fig = plt.gcf()
+        fig.patch.set_facecolor("#111")
+        ax = plt.gca()
+        ax.set_facecolor("#222")
+        ax.tick_params(colors="white")
+        ax.xaxis.label.set_color("white")
+        ax.yaxis.label.set_color("white")
+        plt.show()
+
+    except Exception as e:
+        print("❌ Eroare la generarea graficului:", e)
