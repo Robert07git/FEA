@@ -18,7 +18,7 @@ class QuizWindow(tk.Toplevel):
         self.time_limit = time_limit
         self.current = 0
         self.score = 0
-        self.selected_answer = tk.StringVar(value="")  # corect: inițializare sigură
+        self.selected_answer = tk.StringVar(value="")
         self.running = True
         self.timer_thread = None
         self.time_left = time_limit if time_limit else 0
@@ -29,10 +29,27 @@ class QuizWindow(tk.Toplevel):
     # ------------------------------------------------------------
 
     def create_widgets(self):
+        """Creează interfața principală"""
+
         tk.Label(
             self, text="FEA Quiz", font=("Segoe UI", 20, "bold"),
             bg="#111", fg="#00FFFF"
-        ).pack(pady=15)
+        ).pack(pady=10)
+
+        # Bara progres întrebări
+        self.progress_label = tk.Label(
+            self, text="Progres: 0%", font=("Segoe UI", 11, "bold"),
+            bg="#111", fg="#00FFFF"
+        )
+        self.progress_label.pack(pady=5)
+
+        self.progress_questions_frame = tk.Frame(self, bg="#222", width=400, height=10)
+        self.progress_questions_frame.pack(pady=5)
+        self.progress_questions_frame.pack_propagate(False)
+        self.progress_questions_bar = tk.Frame(
+            self.progress_questions_frame, bg="#00FFFF", width=0, height=10
+        )
+        self.progress_questions_bar.pack(side="left", fill="y")
 
         self.label_qnum = tk.Label(
             self, text="", font=("Segoe UI", 12, "bold"),
@@ -49,14 +66,13 @@ class QuizWindow(tk.Toplevel):
         self.options_frame = tk.Frame(self, bg="#111")
         self.options_frame.pack(pady=10)
 
-        # timer text
+        # Timer + bară progres timp
         self.timer_label = tk.Label(
             self, text="", font=("Segoe UI", 12, "bold"),
             bg="#111", fg="#00FFFF"
         )
         self.timer_label.pack(pady=5)
 
-        # bară de progres timp
         self.progress_frame = tk.Frame(self, bg="#222", width=400, height=20)
         self.progress_frame.pack(pady=5)
         self.progress_frame.pack_propagate(False)
@@ -79,7 +95,16 @@ class QuizWindow(tk.Toplevel):
             return
 
         q = self.questions[self.current]
-        self.selected_answer.set("")  # reset răspuns curent
+
+        # Reset răspuns curent + refresh vizual
+        self.selected_answer.set("")
+        self.update_idletasks()
+
+        # Actualizare progres întrebări
+        total = len(self.questions)
+        progress_percent = int(((self.current) / total) * 100)
+        self.progress_label.config(text=f"Progres: {progress_percent}%")
+        self.progress_questions_bar.config(width=int((self.current / total) * 400))
 
         self.label_qnum.config(
             text=f"Întrebarea {self.current + 1}/{len(self.questions)}:"
@@ -90,7 +115,7 @@ class QuizWindow(tk.Toplevel):
         for widget in self.options_frame.winfo_children():
             widget.destroy()
 
-        # Adăugăm opțiuni — doar una selectabilă
+        # Adăugăm opțiuni radio
         for i, option in enumerate(q["choices"]):
             rb = tk.Radiobutton(
                 self.options_frame,
@@ -98,8 +123,9 @@ class QuizWindow(tk.Toplevel):
                 variable=self.selected_answer,
                 value=option,
                 bg="#111", fg="white",
-                activebackground="#00FFFF", activeforeground="black",
-                selectcolor="#111",  # fundal neutru
+                activebackground="#111", activeforeground="#00FFFF",
+                indicatoron=True,
+                selectcolor="#111",
                 font=("Segoe UI", 11),
                 anchor="w", justify="left", wraplength=700
             )
@@ -127,7 +153,7 @@ class QuizWindow(tk.Toplevel):
             mins, secs = divmod(self.time_left, 60)
             self.timer_label.config(text=f"Timp rămas: {mins:02d}:{secs:02d}")
 
-            # Bara de progres se micșorează
+            # Bara de progres timp
             bar_width = int((self.time_left / self.time_limit) * 400)
             self.progress_bar.config(width=bar_width)
 
@@ -141,7 +167,7 @@ class QuizWindow(tk.Toplevel):
                     try:
                         playsound(sound_path, block=False)
                     except Exception:
-                        pass  # ignorăm erorile audio
+                        pass
 
         if self.running and self.time_left <= 0:
             self.timer_label.config(text="Timp expirat!", fg="cyan")
@@ -180,6 +206,10 @@ class QuizWindow(tk.Toplevel):
         self.running = False
         for widget in self.winfo_children():
             widget.destroy()
+
+        # actualizare progres final complet
+        self.progress_questions_bar.config(width=400)
+        self.progress_label.config(text="Progres: 100%")
 
         score_percent = round((self.score / len(self.questions)) * 100, 2)
         tk.Label(
