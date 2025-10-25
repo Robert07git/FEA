@@ -7,29 +7,40 @@ FONT_PATH = os.path.join("data", "DejaVuSans.ttf")
 def export_pdf_modern(result, answers=None):
     """
     Generează raport PDF complet cu suport Unicode (ă, î, ș, ț).
-    result = dict cu scor, timp etc.
-    answers = lista cu întrebări + explicații (doar pentru TRAIN)
+    answers este lista cu întrebări + răspunsuri + explicații din TRAIN mode.
     """
     pdf = FPDF()
     pdf.add_page()
 
-    # === Font Unicode sau fallback ===
+    # -------------------------------------------------
+    # Font Unicode (regular + "bold" map-uit manual)
+    # -------------------------------------------------
     if os.path.exists(FONT_PATH):
+        # font normal
         pdf.add_font("DejaVuSans", "", FONT_PATH, uni=True)
-        pdf.set_font("DejaVuSans", "", 12)
-        font_name = "DejaVuSans"
-    else:
-        pdf.set_font("Arial", "", 12)
-        font_name = "Arial"
+        # "bold" - folosim același fișier, doar sub alt nume
+        pdf.add_font("DejaVuSansBold", "", FONT_PATH, uni=True)
 
-    # === Titlu raport ===
-    pdf.set_font(font_name, "B", 18)
+        base_font = "DejaVuSans"
+        bold_font = "DejaVuSansBold"
+    else:
+        # fallback pe Arial dacă nu e găsit fontul
+        base_font = "Arial"
+        bold_font = "Arial"
+
+    # -------------------------------------------------
+    # Titlu raport
+    # -------------------------------------------------
+    pdf.set_font(bold_font, "", 18)
     pdf.set_text_color(0, 102, 204)
     pdf.cell(0, 10, "FEA Quiz Trainer - Raport Sesiune", new_y="NEXT", align="C")
 
-    # === Date generale sesiune ===
-    pdf.set_font(font_name, "", 12)
+    # -------------------------------------------------
+    # Rezumat general sesiune
+    # -------------------------------------------------
+    pdf.set_font(base_font, "", 12)
     pdf.set_text_color(0, 0, 0)
+
     pdf.cell(0, 10, f"Mod: {result['mode'].capitalize()}", new_y="NEXT")
     pdf.cell(0, 10, f"Domeniu: {result['domain']}", new_y="NEXT")
     pdf.cell(0, 10, f"Scor: {result['score']}/{result['total']} ({result['percent']}%)", new_y="NEXT")
@@ -37,14 +48,16 @@ def export_pdf_modern(result, answers=None):
     pdf.cell(0, 10, f"Timp: {result['time_used']} secunde", new_y="NEXT")
     pdf.cell(0, 10, f"Data: {result['date']}", new_y="NEXT")
 
-    # === Doar în TRAIN: detalii pe întrebări ===
+    # -------------------------------------------------
+    # Doar pentru TRAIN MODE: detalii per întrebare
+    # -------------------------------------------------
     if answers:
         pdf.ln(8)
-        pdf.set_font(font_name, "B", 14)
+        pdf.set_font(bold_font, "", 14)
         pdf.set_text_color(0, 102, 204)
         pdf.cell(0, 10, "📘 Detalii întrebări (Train Mode):", new_y="NEXT")
 
-        pdf.set_font(font_name, "", 11)
+        pdf.set_font(base_font, "", 11)
         pdf.set_text_color(0, 0, 0)
 
         for i, ans in enumerate(answers, 1):
@@ -54,7 +67,9 @@ def export_pdf_modern(result, answers=None):
             pdf.multi_cell(0, 8, f"💡 Explicație: {ans['explanation']}", new_y="NEXT")
             pdf.cell(0, 5, "---------------------------------------------", new_y="NEXT")
 
-    # === Salvare raport ===
+    # -------------------------------------------------
+    # Salvare PDF
+    # -------------------------------------------------
     os.makedirs("data", exist_ok=True)
     output_path = os.path.join("data", "last_session_report.pdf")
     pdf.output(output_path)
