@@ -1,25 +1,55 @@
 {
-  "title": "Analiza structurală FEA – bazele",
+  "title": "Analiza structurală (Static / Nonlinear / Strength)",
   "sections": [
     {
-      "subtitle": "Ce este o analiză structurală?",
-      "content": "Analiza structurală estimează răspunsul piesei la sarcini mecanice (forțe, presiuni, accelerații, gravitație etc.). Scopul este să aflăm deplasări, tensiuni, siguranță la cedare."
+      "subtitle": "1. Ce este analiza structurală?",
+      "content": "Analiza structurală prezice cum se deformează o piesă sub sarcini mecanice (forțe, presiuni, greutate, accelerații). Rezultatele tipice sunt deplasări, tensiuni și factori de siguranță.",
+      "image": "images/structural/structural_overview.png"
     },
     {
-      "subtitle": "Tipuri de elemente finite",
-      "content": "1D (bară/beam): folosit pentru lonjeroane, cadre, grinzi. 2D (shell): folosit pentru tablă subțire, caroserii, componente cu grosime mică. 3D (solid/brick/tetra): folosit pentru zone groase, blocuri, structuri complexe unde starea de tensiune e volumică."
+      "subtitle": "2. Tipuri de elemente finite (1D / 2D / 3D)",
+      "content": "Element 1D (beam) pentru lonjeroane, bare. Element 2D (shell) pentru tablă subțire și caroserie. Element 3D (solid brick/tet) pentru piese groase sau zone cu tensiuni complexe.",
+      "image": "images/structural/mesh_types.png"
     },
     {
-      "subtitle": "Condiții de frontieră",
-      "content": "Fixările trebuie să reprezinte realitatea. O fixare \"totul blocat\" duce la tensiuni artificiale. În practică se blochează DOF-urile pe direcția în care piesa e efectiv constrânsă în utilizare."
+      "subtitle": "3. Boundary conditions (condiții de frontieră)",
+      "content": "Fixările definesc cum e ținută piesa în realitate. Nu bloca toate gradele de libertate decât dacă în viața reală chiar nu se poate mișca absolut deloc.",
+      "image": ""
     },
     {
-      "subtitle": "Nonlinearitate",
-      "content": "Analiză neliniară apare în cazuri cu plastificare material, contact, mari deformații. Solverul folosește incrementare și iterații Newton-Raphson pentru a găsi echilibrul pas cu pas."
+      "subtitle": "4. Sarcini aplicate",
+      "content": "Poți aplica forțe, presiuni, greutate proprie (gravity), accelerații, încărcări distribuite pe suprafețe sau pe muchii. Definirea realistă a sarcinii valorează mai mult decât un mesh foarte fin.",
+      "image": ""
     },
     {
-      "subtitle": "Calitatea mesh-ului",
-      "content": "Elementele foarte distorsionate → rezultate proaste. Mesh prea mare → timp lung de calcul. Trebuie un echilibru: suficient de fin în zone critice, mai grosier în rest."
+      "subtitle": "5. Analiză liniară vs neliniară",
+      "content": "Liniar = deformații mici, material elastic, fără contact. Neliniar = contact, plastificare, mari deformații. Neliniarul consumă mai mult timp de calcul, dar este mai aproape de realitate.",
+      "image": ""
+    },
+    {
+      "subtitle": "6. Contact și interacțiuni",
+      "content": "Într-un ansamblu poți defini suprafețe care se ating, se blochează sau alunecă. Contactul neliniar e critic în simulări de asamblare, crash, îndoire, strângere de șuruburi.",
+      "image": ""
+    },
+    {
+      "subtitle": "7. Plasticizare și siguranța la cedare",
+      "content": "Când tensiunile depășesc limita de curgere a materialului, apare plastificarea. Aici verifici dacă piesa rămâne permanent deformată sau cedează.",
+      "image": ""
+    },
+    {
+      "subtitle": "8. Calitatea mesh-ului",
+      "content": "Elementele foarte distorsionate pot genera rezultate greșite. Regula: mesh mai fin în zone cu găuri, raze mici, schimbări bruște de secțiune.",
+      "image": ""
+    },
+    {
+      "subtitle": "9. Factor de siguranță",
+      "content": "Definit ca rezistența materialului împărțită la tensiunea rezultată din analiză. Dacă factorul este < 1 → piesa va ceda în condițiile respective.",
+      "image": ""
+    },
+    {
+      "subtitle": "10. Raportarea rezultatelor",
+      "content": "De obicei prezinți: zone critice cu tensiune maximă, deplasare maximă, factor de siguranță și ce condiții de încărcare au fost folosite. Toate aceste informații trebuie să fie trasabile.",
+      "image": ""
     }
   ]
 }
