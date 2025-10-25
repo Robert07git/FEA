@@ -1,14 +1,6 @@
 import random
 import time
 import threading
-import pygame
-
-# Inițializare sunet pentru notificare la 5 secunde
-pygame.mixer.init()
-try:
-    beep_sound = pygame.mixer.Sound("data/beep.wav")
-except:
-    beep_sound = None
 
 
 class QuizSession:
@@ -20,7 +12,7 @@ class QuizSession:
         :param num_questions: câte întrebări se aleg
         :param mode: "train" sau "exam"
         :param time_limit_sec: secunde per întrebare (doar pentru exam)
-        :param update_ui_callback: funcție pentru actualizarea interfeței
+        :param update_ui_callback: funcție pentru actualizarea interfeței grafice
         """
         self.questions = random.sample(questions, min(num_questions, len(questions)))
         self.mode = mode
@@ -40,7 +32,7 @@ class QuizSession:
         return None
 
     def answer_question(self, choice_index):
-        """Procesează răspunsul utilizatorului."""
+        """Procesează răspunsul utilizatorului și returnează feedback."""
         q = self.get_current_question()
         if not q:
             return False, "Nu mai sunt întrebări."
@@ -72,7 +64,7 @@ class QuizSession:
         return is_correct, feedback
 
     def has_next(self):
-        """Verifică dacă există o întrebare următoare."""
+        """Verifică dacă mai există întrebări."""
         return self.current_index < len(self.questions)
 
     def start_timer(self):
@@ -86,15 +78,9 @@ class QuizSession:
             while self.time_left > 0 and self.timer_running:
                 time.sleep(1)
                 self.time_left -= 1
-
-                # Redă sunet la ultimele 5 secunde
-                if self.time_left == 5 and beep_sound:
-                    beep_sound.play()
-
                 if self.update_ui_callback:
                     self.update_ui_callback()
 
-            # Timp expirat
             if self.timer_running and self.time_left <= 0:
                 self.timer_running = False
                 if self.update_ui_callback:
@@ -110,7 +96,7 @@ class QuizSession:
             self.timer_thread.join(timeout=0.1)
 
     def get_score_summary(self):
-        """Returnează rezumatul scorului."""
+        """Returnează scorul final și procentul."""
         total = len(self.questions)
         pct = (self.score / total) * 100 if total > 0 else 0
         return self.score, total, pct
