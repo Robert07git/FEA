@@ -1,222 +1,187 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from tkinter import filedialog
-import json
-import os
-import matplotlib.pyplot as plt
-from fpdf import FPDF
-from quiz_logic import QuizWindow
+import threading
+import time
+import random
+from quiz_logic import run_quiz
+from data_loader import load_questions
+from export_pdf import export_pdf_report
+from progress_chart import show_progress_chart
+from stats import format_statistics
 
 
 class FEATrainerApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("FEA Quiz Trainer")
-        self.geometry("800x650")
-        self.configure(bg="#111")
-        self.resizable(False, False)
+        self.geometry("900x650")
+        self.configure(bg="#0A0A0A")
 
-        self.questions_data = None
-        self.domains = []
-        self.load_questions()
+        self.mode = tk.StringVar(value="train")
+        self.domain = tk.StringVar(value="structural")
+        self.num_questions = tk.IntVar(value=5)
+        self.time_limit_sec = tk.IntVar(value=15)
 
-        self.create_ui()
+        self.current_question_index = 0
+        self.current_score = 0
+        self.questions = []
+        self.selected_answer = tk.IntVar(value=-1)
+        self.time_remaining = 0
+        self.timer_running = False
 
-    # ----------------------------------------------------------
-    def load_questions(self):
-        """Încarcă fișierul JSON cu întrebări."""
-        try:
-            path = os.path.join(os.path.dirname(__file__), "../data/fea_questions.json")
-            with open(path, "r", encoding="utf-8") as f:
-                self.questions_data = json.load(f)
-            self.domains = list(self.questions_data.keys())
-        except FileNotFoundError:
-            messagebox.showerror("Eroare", "Fișierul fea_questions.json nu a fost găsit!")
-            self.questions_data = {}
-            self.domains = []
+        self.create_menu()
+        self.create_main_ui()
 
-    # ----------------------------------------------------------
-    def create_ui(self):
-        title = tk.Label(self, text="Setări sesiune",
-                         font=("Segoe UI", 18, "bold"),
-                         fg="#00FFFF", bg="#111")
-        title.pack(pady=15)
+    def create_menu(self):
+        menubar = tk.Menu(self)
+        file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu.add_command(label="📄 Export PDF Report", command=self.export_pdf)
+        file_menu.add_command(label="📈 Show Progress Chart", command=self.show_chart)
+        file_menu.add_separator()
+        file_menu.add_command(label="❌ Exit", command=self.quit)
+        menubar.add_cascade(label="Menu", menu=file_menu)
+        self.config(menu=menubar)
 
-        # Domeniu
-        frm_domain = tk.Frame(self, bg="#111")
-        frm_domain.pack(pady=5)
-        tk.Label(frm_domain, text="Domeniu:", bg="#111", fg="white",
-                 font=("Segoe UI", 11)).pack(side="left", padx=5)
-        self.domain_var = tk.StringVar()
-        self.domain_cb = ttk.Combobox(frm_domain, textvariable=self.domain_var,
-                                      values=self.domains, width=25, state="readonly")
-        self.domain_cb.pack(side="left", padx=5)
-        if self.domains:
-            self.domain_cb.current(0)
+    def create_main_ui(self):
+        self.title_label = tk.Label(self, text="FEA Quiz Trainer",
+                                    font=("Segoe UI", 22, "bold"), fg="#00FFFF", bg="#0A0A0A")
+        self.title_label.pack(pady=20)
 
-        # Număr întrebări
-        frm_num = tk.Frame(self, bg="#111")
-        frm_num.pack(pady=5)
-        tk.Label(frm_num, text="Număr întrebări:", bg="#111", fg="white",
-                 font=("Segoe UI", 11)).pack(side="left", padx=5)
-        self.num_var = tk.IntVar(value=5)
-        tk.Spinbox(frm_num, from_=1, to=50, textvariable=self.num_var,
-                   width=5, font=("Segoe UI", 10)).pack(side="left", padx=5)
+        # domeniu
+        tk.Label(self, text="Alege domeniu:", fg="white", bg="#0A0A0A").pack()
+        self.domain_combo = ttk.Combobox(self, values=[
+            "structural", "crash", "moldflow", "cfd", "nvh", "mix"])
+        self.domain_combo.current(0)
+        self.domain_combo.pack(pady=5)
 
-        # Mod
-        frm_mode = tk.Frame(self, bg="#111")
-        frm_mode.pack(pady=5)
-        tk.Label(frm_mode, text="Mod:", bg="#111", fg="white",
-                 font=("Segoe UI", 11)).pack(pady=5)
-        self.mode_var = tk.StringVar(value="TRAIN")
-        tk.Radiobutton(frm_mode, text="TRAIN (feedback imediat)", variable=self.mode_var,
-                       value="TRAIN", bg="#111", fg="white", activebackground="#111",
-                       selectcolor="#111", font=("Segoe UI", 10)).pack(anchor="w", padx=300)
-        tk.Radiobutton(frm_mode, text="EXAM (limită timp, feedback final)", variable=self.mode_var,
-                       value="EXAM", bg="#111", fg="white", activebackground="#111",
-                       selectcolor="#111", font=("Segoe UI", 10)).pack(anchor="w", padx=300)
+        # mod
+        tk.Label(self, text="Mod:", fg="white", bg="#0A0A0A").pack()
+        frame_modes = tk.Frame(self, bg="#0A0A0A")
+        frame_modes.pack()
+        self.train_btn = ttk.Radiobutton(frame_modes, text="Train", variable=self.mode, value="train")
+        self.exam_btn = ttk.Radiobutton(frame_modes, text="Exam", variable=self.mode, value="exam")
+        self.train_btn.grid(row=0, column=0, padx=10)
+        self.exam_btn.grid(row=0, column=1, padx=10)
 
-        # Limită timp
-        frm_time = tk.Frame(self, bg="#111")
-        frm_time.pack(pady=5)
-        tk.Label(frm_time, text="Timp pe întrebare (secunde, doar EXAM):", bg="#111",
-                 fg="white", font=("Segoe UI", 11)).pack(side="left", padx=5)
-        self.time_var = tk.IntVar(value=15)
-        tk.Spinbox(frm_time, from_=5, to=120, textvariable=self.time_var,
-                   width=5, font=("Segoe UI", 10)).pack(side="left", padx=5)
+        # nr intrebari
+        tk.Label(self, text="Număr întrebări:", fg="white", bg="#0A0A0A").pack()
+        tk.Entry(self, textvariable=self.num_questions, width=5, justify="center").pack()
 
-        # Start Quiz
-        tk.Button(self, text="► Start Quiz", command=self.start_quiz,
-                  bg="#00FFFF", fg="black", font=("Segoe UI", 12, "bold"),
-                  relief="flat", padx=20, pady=6).pack(pady=15)
+        # timp per întrebare
+        tk.Label(self, text="Timp per întrebare (secunde):", fg="white", bg="#0A0A0A").pack()
+        tk.Entry(self, textvariable=self.time_limit_sec, width=5, justify="center").pack()
 
-        ttk.Separator(self, orient="horizontal").pack(fill="x", pady=10)
+        # start
+        tk.Button(self, text="🚀 Start Quiz", font=("Segoe UI", 12, "bold"),
+                  command=self.start_quiz, bg="#00FFFF", fg="black").pack(pady=15)
 
-        # Secțiune rapoarte
-        tk.Label(self, text="Rapoarte & Analiză",
-                 font=("Segoe UI", 14, "bold"),
-                 fg="#00FFFF", bg="#111").pack(pady=10)
+        # statistici
+        self.stats_label = tk.Label(self, text=format_statistics(),
+                                    fg="#00FFFF", bg="#0A0A0A", justify="left", font=("Consolas", 10))
+        self.stats_label.pack(pady=10)
 
-        frm_reports = tk.Frame(self, bg="#111")
-        frm_reports.pack(pady=5)
+    def export_pdf(self):
+        path = export_pdf_report()
+        messagebox.showinfo("Export PDF", f"Raportul a fost salvat în:\n{path}")
 
-        tk.Button(frm_reports, text="📊 Grafic progres",
-                  command=self.show_progress_chart,
-                  bg="#00FFFF", fg="black", font=("Segoe UI", 10, "bold"),
-                  relief="flat", padx=10, pady=5).grid(row=0, column=0, padx=10, pady=5)
+    def show_chart(self):
+        show_progress_chart()
 
-        tk.Button(frm_reports, text="📄 Generează PDF",
-                  command=self.generate_pdf_report,
-                  bg="#00FFFF", fg="black", font=("Segoe UI", 10, "bold"),
-                  relief="flat", padx=10, pady=5).grid(row=0, column=1, padx=10, pady=5)
-
-        tk.Button(frm_reports, text="📈 Statistici",
-                  command=self.show_stats,
-                  bg="#00FFFF", fg="black", font=("Segoe UI", 10, "bold"),
-                  relief="flat", padx=10, pady=5).grid(row=0, column=2, padx=10, pady=5)
-
-    # ----------------------------------------------------------
     def start_quiz(self):
-        selected = self.domain_var.get()
-        mode = self.mode_var.get()
-        tlim = self.time_var.get() if mode == "EXAM" else None
+        domain = self.domain_combo.get()
+        num = self.num_questions.get()
+        mode = self.mode.get()
+        tlimit = self.time_limit_sec.get()
 
-        if not selected or selected not in self.questions_data:
-            messagebox.showerror("Eroare", "Selectează un domeniu valid!")
+        self.questions = load_questions(domain)
+        if len(self.questions) == 0:
+            messagebox.showerror("Eroare", f"Nu există întrebări pentru domeniul {domain}.")
             return
 
-        questions = self.questions_data[selected][:self.num_var.get()]
-        for q in questions:
-            q["domain"] = selected
+        random.shuffle(self.questions)
+        self.questions = self.questions[:num]
+        self.current_question_index = 0
+        self.current_score = 0
 
-        QuizWindow(self, questions, mode, tlim)
+        self.show_question_ui(mode, tlimit)
 
-    # ----------------------------------------------------------
-    def show_progress_chart(self):
-        """Desenează grafic progres."""
-        try:
-            path = os.path.join(os.path.dirname(__file__), "score_history.txt")
-            if not os.path.exists(path):
-                messagebox.showinfo("Info", "Nu există date de progres încă.")
-                return
+    def show_question_ui(self, mode, time_limit):
+        for widget in self.winfo_children():
+            widget.destroy()
 
-            domains, scores = [], []
-            with open(path, "r", encoding="utf-8") as f:
-                for line in f:
-                    parts = line.strip().split(",")
-                    if len(parts) == 4:
-                        domain, mode, total, pct = parts
-                        domains.append(domain)
-                        scores.append(float(pct))
+        q = self.questions[self.current_question_index]
+        self.selected_answer.set(-1)
 
-            plt.figure(figsize=(8, 4))
-            plt.title("Progresul scorurilor în timp")
-            plt.plot(scores, marker="o", color="#00FFFF")
-            plt.xlabel("Sesiune")
-            plt.ylabel("Scor (%)")
-            plt.grid(True, linestyle="--", alpha=0.6)
-            plt.tight_layout()
-            plt.show()
+        tk.Label(self, text=f"Întrebarea {self.current_question_index + 1}/{len(self.questions)}",
+                 fg="#00FFFF", bg="#0A0A0A", font=("Segoe UI", 12, "bold")).pack(pady=10)
 
-        except Exception as e:
-            messagebox.showerror("Eroare", f"A apărut o problemă la afișarea graficului:\n{e}")
+        tk.Label(self, text=q["question"], wraplength=800, fg="white",
+                 bg="#0A0A0A", font=("Segoe UI", 13)).pack(pady=10)
 
-    # ----------------------------------------------------------
-    def generate_pdf_report(self):
-        """Generează raport PDF cu scorurile."""
-        try:
-            path = os.path.join(os.path.dirname(__file__), "score_history.txt")
-            if not os.path.exists(path):
-                messagebox.showinfo("Info", "Nu există date pentru raport PDF.")
-                return
+        for i, choice in enumerate(q["choices"]):
+            rb = ttk.Radiobutton(self, text=choice, variable=self.selected_answer, value=i)
+            rb.pack(anchor="w", padx=50, pady=3)
 
-            pdf_dir = os.path.join(os.path.dirname(__file__), "../reports")
-            os.makedirs(pdf_dir, exist_ok=True)
-            pdf_path = os.path.join(pdf_dir, "FEA_Quiz_Report.pdf")
+        self.feedback_label = tk.Label(self, text="", fg="white", bg="#0A0A0A", font=("Segoe UI", 12))
+        self.feedback_label.pack(pady=10)
 
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", "B", 16)
-            pdf.cell(0, 10, "FEA Quiz Report", ln=True, align="C")
+        # Bara progres
+        self.progress = ttk.Progressbar(self, length=400, mode="determinate", maximum=time_limit)
+        self.progress.pack(pady=10)
+        self.progress["value"] = 0
 
-            pdf.set_font("Arial", "", 12)
-            with open(path, "r", encoding="utf-8") as f:
-                for line in f:
-                    pdf.cell(0, 10, line.strip(), ln=True)
+        self.timer_label = tk.Label(self, text=f"Timp rămas: {time_limit}s", fg="#00FFFF", bg="#0A0A0A")
+        self.timer_label.pack()
 
-            pdf.output(pdf_path)
-            messagebox.showinfo("Succes", f"Raport PDF generat:\n{pdf_path}")
-        except Exception as e:
-            messagebox.showerror("Eroare", f"Eroare la generarea PDF:\n{e}")
+        self.submit_btn = tk.Button(self, text="Trimite răspunsul", command=lambda: self.check_answer(mode))
+        self.submit_btn.pack(pady=10)
 
-    # ----------------------------------------------------------
-    def show_stats(self):
-        """Afișează medie scoruri."""
-        try:
-            path = os.path.join(os.path.dirname(__file__), "score_history.txt")
-            if not os.path.exists(path):
-                messagebox.showinfo("Info", "Nu există date pentru statistici.")
-                return
+        self.time_remaining = time_limit
+        if mode == "exam":
+            self.timer_running = True
+            threading.Thread(target=self.update_timer, daemon=True).start()
 
-            scores = []
-            with open(path, "r", encoding="utf-8") as f:
-                for line in f:
-                    parts = line.strip().split(",")
-                    if len(parts) == 4:
-                        scores.append(float(parts[3]))
+    def update_timer(self):
+        while self.timer_running and self.time_remaining > 0:
+            time.sleep(1)
+            self.time_remaining -= 1
+            self.progress["value"] = self.progress["maximum"] - self.time_remaining
+            self.timer_label.config(text=f"Timp rămas: {self.time_remaining}s")
+            if self.time_remaining <= 0:
+                self.check_answer("exam")
 
-            if not scores:
-                messagebox.showinfo("Info", "Nu există scoruri valide.")
-                return
+    def check_answer(self, mode):
+        self.timer_running = False
+        q = self.questions[self.current_question_index]
+        ans = self.selected_answer.get()
 
-            avg = sum(scores) / len(scores)
-            messagebox.showinfo("Statistici", f"Media scorurilor: {avg:.2f}%")
+        if ans == -1:
+            self.feedback_label.config(text="⚠️ Nu ai selectat niciun răspuns!", fg="orange")
+            return
 
-        except Exception as e:
-            messagebox.showerror("Eroare", f"Eroare la calculul statisticilor:\n{e}")
+        correct = (ans == q["correct_index"])
+        if correct:
+            self.current_score += 1
+            self.feedback_label.config(text="✅ Corect!", fg="lightgreen")
+        else:
+            text = f"❌ Greșit! Corect: {q['choices'][q['correct_index']]}"
+            if mode == "train":
+                text += f"\n💡 Explicație: {q['explanation']}"
+            self.feedback_label.config(text=text, fg="red")
+
+        self.after(1800, self.next_question, mode)
+
+    def next_question(self, mode):
+        self.current_question_index += 1
+        if self.current_question_index < len(self.questions):
+            self.show_question_ui(mode, self.time_limit_sec.get())
+        else:
+            pct = (self.current_score / len(self.questions)) * 100
+            messagebox.showinfo("Rezultat Final",
+                                f"Scor final: {self.current_score}/{len(self.questions)} ({pct:.1f}%)")
+            self.destroy()
 
 
-# ----------------------------------------------------------
 if __name__ == "__main__":
     app = FEATrainerApp()
     app.mainloop()
