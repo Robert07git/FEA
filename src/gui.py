@@ -25,6 +25,7 @@ class QuizApp:
         self.session = None
         self.time_remaining = 0
         self.timer_job = None
+        self.timer_label = None  # ✅ prevenim AttributeError
 
         self.create_main_menu()
 
@@ -132,11 +133,17 @@ class QuizApp:
     def start_timer(self, seconds):
         self.stop_timer()
         self.time_remaining = seconds
+        if not self.timer_label or not hasattr(self.timer_label, "config"):
+            self.timer_label = tk.Label(self.root, text="", bg="#111", fg="cyan", font=("Arial", 11, "bold"))
+            self.timer_label.pack(pady=(5, 0))
+        self.session.timer_running = True
         self.update_timer()
 
     def update_timer(self):
         if not self.session or not self.session.timer_running:
             return
+        if not hasattr(self, "timer_label") or not self.timer_label.winfo_exists():
+            return  # dacă widgetul a fost distrus, ieșim
 
         self.timer_label.config(text=f"Timp rămas: {self.time_remaining}s")
         if self.time_remaining > 0:
