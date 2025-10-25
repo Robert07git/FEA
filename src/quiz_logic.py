@@ -13,6 +13,7 @@ class QuizSession:
         self.start_time = None
         self.results = []
         self.timer_running = False
+        self.timer_job = None
 
     # ===================== PORNIRE QUIZ =====================
     def run(self):
@@ -31,11 +32,25 @@ class QuizSession:
     def show_question(self):
         question = self.current_question()
         if question:
+            # Resetăm orice timer vechi
+            self.stop_timer()
             if self.mode == "exam" and self.time_limit:
                 self.timer_running = True
+                self.app.start_timer(self.time_limit)
             self.app.show_question()
         else:
             self.end_quiz()
+
+    # ===================== OPRIRE TIMER =====================
+    def stop_timer(self):
+        """Oprește timerul activ, dacă există."""
+        self.timer_running = False
+        if self.timer_job:
+            try:
+                self.app.root.after_cancel(self.timer_job)
+            except Exception:
+                pass
+            self.timer_job = None
 
     # ===================== RĂSPUNS =====================
     def answer(self, choice_index):
@@ -59,13 +74,18 @@ class QuizSession:
         # ================== MOD TRAIN ==================
         if self.mode == "train":
             correct_text = question["choices"][question["correct_index"]]
-            self.app.show_train_feedback(correct, correct_text, question.get("explanation", ""))
+            expl = question.get("explanation", "")
+            if correct:
+                msg = f"✅ Corect!\n\nExplicație: {expl}"
+            else:
+                msg = f"❌ Greșit!\n\nRăspuns corect: {correct_text}\nExplicație: {expl}"
+            self.app.show_train_feedback(correct, msg)
         else:
-            # în exam mergem direct la următoarea întrebare
             self.next_question()
 
     # ===================== URMĂTOAREA ÎNTREBARE =====================
     def next_question(self):
+        self.stop_timer()
         self.index += 1
         if self.index < len(self.questions):
             self.show_question()
@@ -74,6 +94,7 @@ class QuizSession:
 
     # ===================== FINAL QUIZ =====================
     def end_quiz(self):
+        self.stop_timer()
         duration = time.time() - self.start_time if self.start_time else 0
         total = len(self.questions)
         pct = (self.correct_count / total) * 100 if total > 0 else 0
@@ -88,9 +109,8 @@ class QuizSession:
             "timp_intrebare": self.time_limit if self.time_limit else "n/a"
         })
 
-        # ✅ doar o singură afișare la final
+        # ✅ doar un singur apel, fără duplicare
         if self.mode == "exam":
             self.app.show_exam_summary(self.results, self.correct_count, total, pct, duration)
         else:
-            # în TRAIN revenim automat la meniu după ultima întrebare
             self.app.show_main_menu()
