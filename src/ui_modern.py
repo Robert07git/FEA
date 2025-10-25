@@ -3,8 +3,8 @@ import customtkinter as ctk
 from tkinter import messagebox
 
 # === SETĂRI GLOBALE ===
-ctk.set_appearance_mode("dark")      # "light" sau "dark"
-ctk.set_default_color_theme("blue")  # "green", "dark-blue", etc.
+ctk.set_appearance_mode("dark")      # Poți schimba în "light"
+ctk.set_default_color_theme("blue")  # Variante: "blue", "green", "dark-blue"
 
 
 class FEAQuizApp(ctk.CTk):
@@ -16,20 +16,18 @@ class FEAQuizApp(ctk.CTk):
         self.geometry("900x600")
         self.resizable(False, False)
 
-        # === CONTAINER PENTRU FRAME-URI ===
+        # === CONTAINER PRINCIPAL ===
         self.container = ctk.CTkFrame(self, corner_radius=0)
         self.container.pack(fill="both", expand=True)
 
-        # Dicționar pentru toate frame-urile
+        # === FRAME-URI (ecrane) ===
         self.frames = {}
-
-        # Inițializăm frame-urile disponibile
         for F in (MainMenuFrame,):
             frame = F(parent=self.container, controller=self)
             self.frames[F.__name__] = frame
             frame.grid(row=0, column=0, sticky="nsew")
 
-        # Afișăm meniul principal
+        # === Afișăm meniul principal ===
         self.show_frame("MainMenuFrame")
 
     def show_frame(self, frame_name):
@@ -38,33 +36,65 @@ class FEAQuizApp(ctk.CTk):
         frame.tkraise()
 
 
+# ==============================================================
+#                    MENIU PRINCIPAL MODERN
+# ==============================================================
+
 class MainMenuFrame(ctk.CTkFrame):
-    """Ecranul principal - hub-ul aplicației."""
+    """Ecranul principal - hub-ul aplicației modernizat."""
 
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
 
+        # === CONTAINER CENTRAL ===
+        main_container = ctk.CTkFrame(self)
+        main_container.pack(expand=True)  # Centrează pe ambele axe (x și y)
+
         # === TITLU ===
-        title = ctk.CTkLabel(self, text="FEA QUIZ TRAINER", font=("Poppins", 28, "bold"), text_color="#00E6E6")
-        title.pack(pady=(40, 20))
+        title = ctk.CTkLabel(
+            main_container,
+            text="FEA QUIZ TRAINER",
+            font=("Poppins", 32, "bold"),
+            text_color="#00E6E6"
+        )
+        title.pack(pady=(10, 30))
 
-        # === BUTOANE PRINCIPALE ===
-        button_style = {"width": 250, "height": 45, "corner_radius": 10, "font": ("Poppins", 16, "bold")}
+        # === GRUP DE BUTOANE ===
+        button_style = {
+            "width": 260,
+            "height": 45,
+            "corner_radius": 12,
+            "font": ("Poppins", 16, "bold")
+        }
 
-        ctk.CTkButton(self, text="🎯 TRAIN MODE", command=self.start_train, **button_style).pack(pady=10)
-        ctk.CTkButton(self, text="🧾 EXAM MODE", command=self.start_exam, **button_style).pack(pady=10)
-        ctk.CTkButton(self, text="📈 STATISTICI", command=self.open_stats, **button_style).pack(pady=10)
-        ctk.CTkButton(self, text="📊 GRAFIC PROGRES", command=self.open_chart, **button_style).pack(pady=10)
-        ctk.CTkButton(self, text="📚 LEARN MODE", command=self.learn_mode, **button_style).pack(pady=10)
-        ctk.CTkButton(self, text="🏆 LEADERBOARD", command=self.leaderboard, **button_style).pack(pady=10)
-        ctk.CTkButton(self, text="⚙️ SETĂRI", command=self.open_settings, **button_style).pack(pady=10)
+        # Lista de butoane și acțiunile lor
+        buttons = [
+            ("🎯 TRAIN MODE", self.start_train),
+            ("🧾 EXAM MODE", self.start_exam),
+            ("📈 STATISTICI", self.open_stats),
+            ("📊 GRAFIC PROGRES", self.open_chart),
+            ("📚 LEARN MODE", self.learn_mode),
+            ("🏆 LEADERBOARD", self.leaderboard),
+            ("⚙️ SETĂRI", self.open_settings),
+        ]
+
+        for text, command in buttons:
+            ctk.CTkButton(main_container, text=text, command=command, **button_style).pack(pady=8)
 
         # === BUTON IEȘIRE ===
-        ctk.CTkButton(self, text="⏻ Ieșire", fg_color="red", hover_color="#CC0000",
-                      command=self.controller.destroy, width=200, height=40, font=("Poppins", 14, "bold")).pack(pady=30)
+        ctk.CTkButton(
+            main_container,
+            text="⏻ IEȘIRE",
+            fg_color="#CC0000",
+            hover_color="#990000",
+            command=self.controller.destroy,
+            width=180,
+            height=40,
+            font=("Poppins", 14, "bold")
+        ).pack(pady=(35, 10))
 
-    # === FUNCȚII TEMPORARE ===
+    # === FUNCȚII TEMPORARE (vor fi conectate ulterior) ===
     def start_train(self):
         messagebox.showinfo("Train Mode", "Aici vom conecta modul TRAIN.")
 
@@ -86,6 +116,10 @@ class MainMenuFrame(ctk.CTkFrame):
     def open_settings(self):
         messagebox.showinfo("Setări", "Aici vor fi preferințele utilizatorului.")
 
+
+# ==============================================================
+#                     RULARE APLICAȚIE
+# ==============================================================
 
 if __name__ == "__main__":
     app = FEAQuizApp()
