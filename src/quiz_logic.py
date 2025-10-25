@@ -1,102 +1,190 @@
+import tkinter as tk
+from tkinter import messagebox
 import random
 import time
-import threading
 
 
 class QuizSession:
-    def __init__(self, questions, num_questions=10, mode="train", time_limit_sec=None, update_ui_callback=None):
-        """
-        Clasa principală pentru gestionarea quizului.
-
-        :param questions: listă de întrebări
-        :param num_questions: câte întrebări se aleg
-        :param mode: "train" sau "exam"
-        :param time_limit_sec: secunde per întrebare (doar pentru exam)
-        :param update_ui_callback: funcție pentru actualizarea interfeței grafice
-        """
-        self.questions = random.sample(questions, min(num_questions, len(questions)))
+    def __init__(self, root, questions, mode="train", time_limit=15, on_end=None):
+        self.root = root
+        self.questions = questions
         self.mode = mode
-        self.time_limit = time_limit_sec
+        self.time_limit = time_limit
+        self.on_end = on_end
+
         self.current_index = 0
-        self.score = 0
+        self.correct_answers = 0
+        self.selected_answer = tk.IntVar(value=-1)
+        self.remaining_time = self.time_limit
+        self.timer_id = None
         self.results = []
-        self.timer_thread = None
-        self.time_left = time_limit_sec
-        self.timer_running = False
-        self.update_ui_callback = update_ui_callback
 
-    def get_current_question(self):
-        """Returnează întrebarea curentă."""
-        if self.current_index < len(self.questions):
-            return self.questions[self.current_index]
-        return None
+        # UI principal
+        self.main_frame = tk.Frame(root, bg="#111")
+        self.main_frame.pack(fill="both", expand=True)
 
-    def answer_question(self, choice_index):
-        """Procesează răspunsul utilizatorului și returnează feedback."""
-        q = self.get_current_question()
-        if not q:
-            return False, "Nu mai sunt întrebări."
+        self.progress_label = tk.Label(self.main_frame, text="Progres: 0%", fg="#00ffff", bg="#111", font=("Arial", 10, "bold"))
+        self.progress_label.pack(pady=(10, 5))
 
-        is_correct = choice_index == q["correct_index"]
-        if is_correct:
-            self.score += 1
+        self.progress_bar = tk.Canvas(self.main_frame, width=400, height=10, bg="#333", highlightthickness=0)
+        self.progress_fill = self.progress_bar.create_rectangle(0, 0, 0, 10, fill="#00ffff", width=0)
+        self.progress_bar.pack()
 
-        self.results.append({
+        self.question_label = tk.Label(self.main_frame, text="", fg="white", bg="#111", wraplength=600, justify="center", font=("Arial", 12, "bold"))
+        self.question_label.pack(pady=(20, 10))
+
+        self.answers_frame = tk.Frame(self.main_frame, bg="#111")
+        self.answers_frame.pack(pady=10)
+
+        self.timer_label = tk.Label(self.main_frame, text="", fg="#00ffff", bg="#111", font=("Arial", 10, "bold"))
+        self.timer_label.pack(pady=(5, 10))
+
+        self.timer_bar = tk.Canvas(self.main_frame, width=400, height=10, bg="#333", highlightthickness=0)
+        self.timer_fill = self.timer_bar.create_rectangle(0, 0, 0, 10, fill="#00ffff", width=0)
+        self.timer_bar.pack(pady=(0, 20))
+
+        self.feedback_label = tk.Label(self.main_frame, text="", fg="#ff5050", bg="#111", wraplength=600, justify="center", font=("Arial", 10, "italic"))
+        self.feedback_label.pack(pady=10)
+
+        self.next_button = tk.Button(
+            self.main_frame,
+            text="Următoarea ➜",
+            font=("Arial", 11, "bold"),
+            bg="#00ffff",
+            activebackground="#00cccc",
+            relief="flat",
+            command=self.next_question
+        )
+        self.next_button.pack(pady=(5, 20))
+
+        self.show_question()
+
+    # -------------------------
+    # AFIȘARE ÎNTREBARE
+    # -------------------------
+    def show_question(self):
+        # resetare selecție
+        self.selected_answer.set(-1)
+        self.feedback_label.config(text="")
+        self.clear_answers()
+
+        if self.current_index >= len(self.questions):
+            self.end_quiz()
+            return
+
+        q = self.questions[self.current_index]
+        self.question_label.config(text=f"Întrebarea {self.current_index + 1}/{len(self.questions)}:\n{q['question']}")
+
+        for idx, choice in enumerate(q["choices"]):
+            rb = tk.Radiobutton(
+                self.answers_frame,
+                text=choice,
+                variable=self.selected_answer,
+                value=idx,
+                fg="#00ffff",
+                bg="#111",
+                selectcolor="#111",
+                activebackground="#111",
+                font=("Arial", 10),
+                anchor="w",
+                justify="left"
+            )
+            rb.pack(fill="x", padx=50, pady=2, anchor="w")
+
+        self.update_progress()
+        if self.mode == "exam":
+            self.start_timer()
+        else:
+            self.timer_label.config(text="Mod TRAIN (fără timp limită)")
+            self.timer_bar.coords(self.timer_fill, 0, 0, 0, 10)
+
+    # -------------------------
+    # BUTON URMĂTOAREA
+    # -------------------------
+    def next_question(self):
+        if self.mode == "exam" and self.timer_id:
+            self.root.after_cancel(self.timer_id)
+
+        selected = self.selected_answer.get()
+        q = self.questions[self.current_index]
+        correct = (selected == q["correct_index"])
+        if correct:
+            self.correct_answers += 1
+
+        result = {
             "idx": self.current_index + 1,
             "question": q["question"],
             "choices": q["choices"],
             "correct_index": q["correct_index"],
-            "user_index": choice_index,
-            "correct": is_correct,
-            "explanation": q.get("explanation", ""),
-            "domain": q.get("domain", "n/a"),
-        })
+            "selected_index": selected,
+            "correct": correct,
+            "explanation": q["explanation"],
+            "domain": q["domain"]
+        }
+        self.results.append(result)
 
-        feedback = ""
         if self.mode == "train":
-            if is_correct:
-                feedback = "✅ Corect!"
+            if not correct:
+                self.feedback_label.config(
+                    text=f"❌ Răspuns greșit!\nCorect: {q['choices'][q['correct_index']]}\nExplicație: {q['explanation']}",
+                    fg="#ff5050"
+                )
             else:
-                correct_text = q["choices"][q["correct_index"]]
-                feedback = f"❌ Greșit. Corect: {correct_text}\nExplicație: {q.get('explanation', '')}"
+                self.feedback_label.config(text="✅ Corect! Bravo!", fg="#00ff88")
+            self.root.after(2500, self.advance_question)
+        else:
+            self.advance_question()
 
+    def advance_question(self):
         self.current_index += 1
-        return is_correct, feedback
+        if self.current_index < len(self.questions):
+            self.show_question()
+        else:
+            self.end_quiz()
 
-    def has_next(self):
-        """Verifică dacă mai există întrebări."""
-        return self.current_index < len(self.questions)
-
+    # -------------------------
+    # TIMER
+    # -------------------------
     def start_timer(self):
-        """Pornește timerul pentru întrebare (doar în EXAM)."""
-        if self.mode != "exam" or not self.time_limit:
-            return
-        self.time_left = self.time_limit
-        self.timer_running = True
+        self.remaining_time = self.time_limit
+        self.update_timer_bar()
+        self.update_timer_label()
+        self.tick_timer()
 
-        def countdown():
-            while self.time_left > 0 and self.timer_running:
-                time.sleep(1)
-                self.time_left -= 1
-                if self.update_ui_callback:
-                    self.update_ui_callback()
+    def tick_timer(self):
+        if self.remaining_time > 0:
+            self.remaining_time -= 1
+            self.update_timer_bar()
+            self.update_timer_label()
+            self.timer_id = self.root.after(1000, self.tick_timer)
+        else:
+            self.next_question()
 
-            if self.timer_running and self.time_left <= 0:
-                self.timer_running = False
-                if self.update_ui_callback:
-                    self.update_ui_callback(timeout=True)
+    def update_timer_label(self):
+        self.timer_label.config(text=f"Timp rămas: {self.remaining_time:02d} secunde")
 
-        self.timer_thread = threading.Thread(target=countdown, daemon=True)
-        self.timer_thread.start()
+    def update_timer_bar(self):
+        progress = 400 * (self.remaining_time / self.time_limit)
+        self.timer_bar.coords(self.timer_fill, 0, 0, progress, 10)
 
-    def stop_timer(self):
-        """Oprește timerul (la trecerea la următoarea întrebare)."""
-        self.timer_running = False
-        if self.timer_thread and self.timer_thread.is_alive():
-            self.timer_thread.join(timeout=0.1)
+    # -------------------------
+    # PROGRES & SFÂRȘIT QUIZ
+    # -------------------------
+    def update_progress(self):
+        percent = int((self.current_index / len(self.questions)) * 100)
+        self.progress_label.config(text=f"Progres: {percent}%")
+        self.progress_bar.coords(self.progress_fill, 0, 0, 4 * percent, 10)
 
-    def get_score_summary(self):
-        """Returnează scorul final și procentul."""
-        total = len(self.questions)
-        pct = (self.score / total) * 100 if total > 0 else 0
-        return self.score, total, pct
+    def end_quiz(self):
+        for widget in self.main_frame.winfo_children():
+            widget.destroy()
+        pct = (self.correct_answers / len(self.questions)) * 100 if self.questions else 0
+        end_text = f"✅ Ai terminat!\nScor: {self.correct_answers}/{len(self.questions)} ({pct:.1f}%)"
+        tk.Label(self.main_frame, text=end_text, bg="#111", fg="#00ffff", font=("Arial", 14, "bold")).pack(pady=30)
+
+        if self.on_end:
+            self.on_end(self.correct_answers, len(self.questions), self.results)
+
+    def clear_answers(self):
+        for widget in self.answers_frame.winfo_children():
+            widget.destroy()
