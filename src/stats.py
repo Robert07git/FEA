@@ -1,67 +1,135 @@
 import os
-from collections import defaultdict
+import tkinter as tk
+from tkinter import ttk, messagebox
+import statistics
 
 
 def show_dashboard():
-    """
-    Citește istoricul din score_history.txt și afișează statistici utile:
-    - media generală
-    - cele mai frecvente domenii
-    - scorul maxim și minim
-    - număr total de sesiuni
-    """
+    """Afișează statistici generale din score_history.txt"""
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     history_path = os.path.join(base_dir, "score_history.txt")
 
     if not os.path.exists(history_path):
-        print("\n[INFO] Nu există fișier score_history.txt. Rulează un quiz mai întâi.")
+        messagebox.showwarning("Lipsă date", "Nu există fișierul score_history.txt. Fă cel puțin un quiz.")
         return
 
-    domenii_stats = defaultdict(list)
+    try:
+        results = []
+        with open(history_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or "scor=" not in line:
+                    continue
 
-    with open(history_path, "r", encoding="utf-8") as f:
-        lines = [l.strip() for l in f.readlines() if l.strip()]
+                try:
+                    parts = [p.strip() for p in line.split("|")]
+                    domeniu = parts[1].split("=")[-1].strip()
+                    mod = parts[2].split("=")[-1].strip().upper()
+                    scor = parts[3].split("=")[-1].split("/")[0].strip()
+                    total = parts[3].split("/")[-1].split()[0].strip()
+                    procent = parts[4].split("=")[-1].replace("%", "").strip()
 
-    if not lines:
-        print("\n[INFO] Fișierul score_history.txt este gol.")
-        return
+                    results.append({
+                        "domeniu": domeniu,
+                        "mod": mod,
+                        "scor": int(scor),
+                        "total": int(total),
+                        "procent": float(procent)
+                    })
+                except:
+                    continue
 
-    for line in lines:
-        parts = [p.strip() for p in line.split("|") if p.strip()]
-        if len(parts) < 5:
-            continue
-        try:
-            domeniu = parts[1].split("=")[1].strip()
-            pct_text = parts[4].split("=")[1].replace("%", "").strip()
-            pct = float(pct_text)
-            domenii_stats[domeniu].append(pct)
-        except Exception:
-            continue
+        if not results:
+            messagebox.showinfo("Info", "Nu există înregistrări valide în score_history.txt.")
+            return
 
-    total_sesiuni = sum(len(v) for v in domenii_stats.values())
-    scoruri_totale = [v for lst in domenii_stats.values() for v in lst]
-    medie_globala = sum(scoruri_totale) / len(scoruri_totale) if scoruri_totale else 0
+        # ==========================
+        #  Creare fereastră Stats
+        # ==========================
+        win = tk.Toplevel()
+        win.title("Statistici generale - FEA Quiz Trainer")
+        win.geometry("650x500")
+        win.configure(bg="#111")
 
-    print("\n=== DASHBOARD FEA QUIZ ===")
-    print(f"Total sesiuni efectuate: {total_sesiuni}")
-    print(f"Scor mediu global: {medie_globala:.1f}%")
+        title = tk.Label(win, text="📊 Statistici generale", font=("Arial", 18, "bold"),
+                         bg="#111", fg="#00ffff")
+        title.pack(pady=10)
 
-    print("\nPerformanță pe domenii:")
-    for d, scoruri in domenii_stats.items():
-        medie = sum(scoruri) / len(scoruri)
-        max_score = max(scoruri)
-        min_score = min(scoruri)
-        print(f"  • {d:<10} -> Medie: {medie:.1f}% | Max: {max_score:.1f}% | Min: {min_score:.1f}% | Sesiuni: {len(scoruri)}")
+        # Statistici generale
+        medie_totala = statistics.mean(r["procent"] for r in results)
+        nr_teste = len(results)
 
-    best_domain = max(domenii_stats, key=lambda d: sum(domenii_stats[d]) / len(domenii_stats[d]))
-    worst_domain = min(domenii_stats, key=lambda d: sum(domenii_stats[d]) / len(domenii_stats[d]))
-    print("\nCel mai bun domeniu:", best_domain)
-    print("Domeniul ce necesită îmbunătățire:", worst_domain)
+        lbl_sumar = tk.Label(win,
+            text=f"Total sesiuni: {nr_teste}\nMedia generală: {medie_totala:.1f}%",
+            font=("Arial", 12), bg="#111", fg="white")
+        lbl_sumar.pack(pady=10)
 
-    print("\nSugestie:")
-    if medie_globala >= 85:
-        print("🏆 Excelent! Ești aproape pregătit pentru interviuri CAE.")
-    elif medie_globala >= 65:
-        print("📈 Foarte bine! Lucrează la consistență în domeniile mai slabe.")
-    else:
-        print("💡 Mai exersează. Concentrează-te pe conceptele de bază și recitește explicațiile din modul TRAIN.")
+        # ==========================
+        #  Medii pe domenii
+        # ==========================
+        domenii = {}
+        for r in results:
+            domenii.setdefault(r["domeniu"], []).append(r["procent"])
+
+        tk.Label(win, text="Medii pe domenii:", font=("Arial", 12, "bold"),
+                 bg="#111", fg="#00ffff").pack()
+
+        frame_dom = tk.Frame(win, bg="#111")
+        frame_dom.pack(pady=5)
+
+        for dom, valori in domenii.items():
+            medie = statistics.mean(valori)
+            tk.Label(frame_dom, text=f"{dom.upper():<12} → {medie:.1f}%",
+                     font=("Consolas", 11), bg="#111", fg="white", anchor="w").pack()
+
+        # ==========================
+        #  Medii pe mod (TRAIN / EXAM)
+        # ==========================
+        moduri = {}
+        for r in results:
+            moduri.setdefault(r["mod"], []).append(r["procent"])
+
+        tk.Label(win, text="\nMedii pe mod:", font=("Arial", 12, "bold"),
+                 bg="#111", fg="#00ffff").pack()
+
+        frame_mod = tk.Frame(win, bg="#111")
+        frame_mod.pack(pady=5)
+
+        for mod, valori in moduri.items():
+            medie = statistics.mean(valori)
+            tk.Label(frame_mod, text=f"{mod:<6} → {medie:.1f}%",
+                     font=("Consolas", 11), bg="#111", fg="white", anchor="w").pack()
+
+        # ==========================
+        #  Tabel detaliat
+        # ==========================
+        tk.Label(win, text="\nRezultate recente:", font=("Arial", 12, "bold"),
+                 bg="#111", fg="#00ffff").pack()
+
+        table = ttk.Treeview(win, columns=("Domeniu", "Mod", "Scor", "Procent"), show="headings", height=10)
+        table.pack(pady=10)
+
+        table.heading("Domeniu", text="Domeniu")
+        table.heading("Mod", text="Mod")
+        table.heading("Scor", text="Scor")
+        table.heading("Procent", text="Procent (%)")
+
+        table.column("Domeniu", anchor="center", width=150)
+        table.column("Mod", anchor="center", width=80)
+        table.column("Scor", anchor="center", width=100)
+        table.column("Procent", anchor="center", width=100)
+
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("Treeview",
+                        background="#222", foreground="white",
+                        fieldbackground="#222", rowheight=25, font=("Arial", 10))
+        style.configure("Treeview.Heading",
+                        background="#00aaaa", foreground="black", font=("Arial", 10, "bold"))
+
+        # adăugare ultimele 15 rezultate
+        for r in results[-15:][::-1]:
+            table.insert("", "end", values=(r["domeniu"], r["mod"], f"{r['scor']}/{r['total']}", f"{r['procent']:.1f}"))
+
+    except Exception as e:
+        messagebox.showerror("Eroare", f"A apărut o eroare la încărcarea statisticilor:\n{e}")
