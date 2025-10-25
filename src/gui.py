@@ -3,8 +3,6 @@ from tkinter import messagebox
 import threading
 import time
 import random
-
-
 class QuizSession:
     def __init__(self, root, questions, num_questions, mode, time_limit=None):
         self.root = root
