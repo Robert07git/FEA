@@ -1,11 +1,14 @@
-# ui_modern.py — FEA Quiz Trainer 4.5 FINAL
-# include: TRAIN/EXAM/LEADERBOARD/STATS/PDF + LEARN MODE cu scroll
+# ui_modern.py — FEA Quiz Trainer 5.0 VISUAL EDITION
+# BAZAT PE versiunea ta 4.5, păstrat TOT, adăugat:
+# - Learn Mode cu imagini (din data/docs/*.json + data/images/...)
+# - Imagini în întrebări (quiz) + în feedback-ul din Train Mode
 
 import customtkinter as ctk
 import json
 import os
 from tkinter import messagebox
 from tkinter import Frame, Canvas, Scrollbar
+from PIL import Image  # <--- nou
 from quiz_engine_modern import QuizManagerModern
 from stats_manager import add_session, load_stats, get_summary, get_leaderboard
 from pdf_exporter_modern import export_pdf_modern
@@ -14,7 +17,7 @@ from pdf_exporter_modern import export_pdf_modern
 class QuizApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("FEA Quiz Trainer 4.5 — Learn Mode Edition")
+        self.title("FEA Quiz Trainer 5.0 — Visual Edition")
         self.geometry("900x600")
         self.configure(fg_color="#202020")
 
@@ -26,6 +29,10 @@ class QuizApp(ctk.CTk):
         self.timer_running = False
         self.last_result = None
 
+        # pentru imagini afișate în quiz / learn mode (ca să nu fie garbage collected)
+        self.current_question_image = None
+        self.current_learn_images = []
+
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
@@ -35,6 +42,28 @@ class QuizApp(ctk.CTk):
         self.right_frame.grid(row=0, column=1, sticky="nswe")
 
         self.create_main_menu()
+
+    # ===================== HELPER IMAGINI =====================
+    def load_ctk_image(self, rel_path, size=(500, 300)):
+        """
+        Încarcă o imagine din folderul data/... și o întoarce ca CTkImage.
+        Dacă nu găsește sau nu poate încărca -> return None.
+        """
+        if not rel_path:
+            return None
+        img_path = os.path.join("data", rel_path)
+        if not os.path.exists(img_path):
+            return None
+
+        try:
+            pil_img = Image.open(img_path)
+            pil_img = pil_img.convert("RGBA")
+            # redimensionare păstrând raportul
+            pil_img.thumbnail(size)
+            return ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=pil_img.size)
+        except Exception as e:
+            print(f"[WARN] Nu pot încărca imaginea {img_path}: {e}")
+            return None
 
     # ========== MENIU PRINCIPAL ==========
     def create_main_menu(self):
@@ -225,9 +254,20 @@ class QuizApp(ctk.CTk):
             wraplength=700,
             font=("Segoe UI", 18, "bold"),
             text_color="white"
-        ).pack(pady=20)
+        ).pack(pady=(15, 10))
 
-        # opțiunile
+        # imagine întrebare (dacă există în JSON field "image": "images/...png")
+        self.current_question_image = None
+        img_obj = self.load_ctk_image(q.get("image", ""), size=(500, 300))
+        if img_obj:
+            self.current_question_image = img_obj  # păstrăm referința
+            ctk.CTkLabel(
+                self.right_frame,
+                image=img_obj,
+                text=""
+            ).pack(pady=(5, 15))
+
+        # opțiuni
         for i, opt in enumerate(q["choices"]):
             ctk.CTkButton(
                 self.right_frame,
@@ -273,6 +313,18 @@ class QuizApp(ctk.CTk):
             text_color="#cccccc",
             wraplength=700
         ).pack(pady=10)
+
+        # reafișăm imaginea întrebării și la feedback, dacă există
+        current_q = self.quiz_manager.questions[self.quiz_manager.current_index]
+        self.current_question_image = None
+        img_obj = self.load_ctk_image(current_q.get("image", ""), size=(500, 300))
+        if img_obj:
+            self.current_question_image = img_obj
+            ctk.CTkLabel(
+                self.right_frame,
+                image=img_obj,
+                text=""
+            ).pack(pady=(10, 15))
 
         if self.quiz_manager.current_index + 1 < self.quiz_manager.total_questions():
             ctk.CTkButton(
@@ -455,13 +507,16 @@ class QuizApp(ctk.CTk):
         ).pack(pady=25)
 
     def open_doc(self, domain_key):
-        """Încarcă fișierul JSON cu teoria și îl afișează într-un frame derulabil."""
+        """
+        Încarcă fișierul JSON cu teoria (data/docs/<domain>.json)
+        și îl afișează într-un frame derulabil.
+        Fiecare secțiune poate avea text + imagine.
+        """
         path = os.path.join("data", "docs", f"{domain_key}.json")
         if not os.path.exists(path):
             messagebox.showwarning("Lipsă conținut", f"Nu există încă material pentru '{domain_key}'.")
             return
 
-        # citim conținutul
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
@@ -495,33 +550,49 @@ class QuizApp(ctk.CTk):
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
+        # resetăm cache-ul de imagini pentru lecție
+        self.current_learn_images = []
+
         # umplem cu secțiuni
         for sec in sections:
             sub = sec.get("subtitle", "")
             txt = sec.get("content", "")
+            img_rel = sec.get("image", "")
 
             block = Frame(scrollable_frame, bg="#2a2a2a", padx=12, pady=10)
             block.pack(fill="x", padx=5, pady=8)
 
-            ctk.CTkLabel(
-                block,
-                text=sub,
-                font=("Segoe UI", 15, "bold"),
-                text_color="#00ffff",
-                wraplength=650,
-                justify="left"
-            ).pack(anchor="w")
+            if sub:
+                ctk.CTkLabel(
+                    block,
+                    text=sub,
+                    font=("Segoe UI", 15, "bold"),
+                    text_color="#00ffff",
+                    wraplength=650,
+                    justify="left"
+                ).pack(anchor="w")
 
-            ctk.CTkLabel(
-                block,
-                text=txt,
-                font=("Segoe UI", 13),
-                text_color="#ffffff",
-                wraplength=650,
-                justify="left"
-            ).pack(anchor="w", pady=(4, 0))
+            if txt:
+                ctk.CTkLabel(
+                    block,
+                    text=txt,
+                    font=("Segoe UI", 13),
+                    text_color="#ffffff",
+                    wraplength=650,
+                    justify="left"
+                ).pack(anchor="w", pady=(4, 8))
 
-        # back
+            # dacă secțiunea are imagine și ea există pe disc -> afișăm
+            img_obj = self.load_ctk_image(img_rel, size=(800, 400))
+            if img_obj:
+                self.current_learn_images.append(img_obj)  # păstrăm referința
+                ctk.CTkLabel(
+                    block,
+                    image=img_obj,
+                    text=""
+                ).pack(anchor="w", pady=(0, 8))
+
+        # butoane back jos
         ctk.CTkButton(
             self.right_frame,
             text="⬅ Înapoi la domenii",
@@ -621,6 +692,8 @@ class QuizApp(ctk.CTk):
     def reset_to_menu(self):
         self.timer_running = False
         self.quiz_manager = None
+        self.current_question_image = None
+        self.current_learn_images = []
         self.clear_right_frame()
         self.create_main_menu()
 
