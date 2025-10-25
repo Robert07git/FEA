@@ -1,7 +1,8 @@
-# ui_modern.py — FEA Quiz Trainer 4.2.1
+# ui_modern.py — FEA Quiz Trainer 4.3 FINAL (PDF + popup + stabilitate)
 import customtkinter as ctk
 import json
 import os
+from tkinter import messagebox
 from quiz_engine_modern import QuizManagerModern
 from stats_manager import add_session, load_stats, get_summary, get_leaderboard
 from pdf_exporter_modern import export_pdf_modern
@@ -10,7 +11,7 @@ from pdf_exporter_modern import export_pdf_modern
 class QuizApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("FEA Quiz Trainer 4.2.1 — PDF, Feedback, Mode Colors, Domain Badge")
+        self.title("FEA Quiz Trainer 4.3 — PDF + Popup + Stabilitate")
         self.geometry("900x600")
         self.configure(fg_color="#202020")
 
@@ -101,6 +102,7 @@ class QuizApp(ctk.CTk):
         self.time_used = 0
         self.timer_running = True
 
+        # Stil vizual diferit pentru moduri
         if self.mode == "train":
             self.color_mode_name = "TRAIN MODE"
             self.color_mode_fg = "#00ffff"
@@ -115,7 +117,6 @@ class QuizApp(ctk.CTk):
 
     # ===== ÎNCĂRCARE QUIZ =====
     def load_quiz(self):
-        """Inițializează interfața testului: timer, progres și prima întrebare"""
         self.clear_right_frame()
         self.create_timer()
         self.create_progress_bar()
@@ -134,10 +135,7 @@ class QuizApp(ctk.CTk):
         self.timer_bar = ctk.CTkProgressBar(self.right_frame, width=400)
         self.timer_bar.pack(pady=5)
         self.timer_bar.set(1)
-        try:
-            self.timer_bar.configure(progress_color=self.color_progress)
-        except Exception:
-            pass
+        self.timer_bar.configure(progress_color=self.color_progress)
 
     def update_timer(self):
         if not self.timer_running:
@@ -158,14 +156,10 @@ class QuizApp(ctk.CTk):
     def create_progress_bar(self):
         self.progress_label = ctk.CTkLabel(self.right_frame, text="", font=("Segoe UI", 14))
         self.progress_label.pack(pady=(10, 0))
-
         self.progress_bar = ctk.CTkProgressBar(self.right_frame, width=400)
         self.progress_bar.pack(pady=5)
         self.progress_bar.set(0)
-        try:
-            self.progress_bar.configure(progress_color=self.color_progress)
-        except Exception:
-            pass
+        self.progress_bar.configure(progress_color=self.color_progress)
 
     def update_progress(self):
         current = self.quiz_manager.current_index + 1
@@ -174,7 +168,7 @@ class QuizApp(ctk.CTk):
         self.progress_bar.set(pct)
         self.progress_label.configure(text=f"Întrebarea {current}/{total}", text_color=self.color_mode_fg)
 
-    # ===== AFIȘARE ÎNTREBARE + BADGE =====
+    # ===== ÎNTREBĂRI =====
     def show_question(self):
         q = self.quiz_manager.get_current_question()
         if not q:
@@ -197,7 +191,7 @@ class QuizApp(ctk.CTk):
                           fg_color="#1E5BA6", hover_color="#297BE6", width=600,
                           command=lambda idx=i: self.handle_answer(idx)).pack(pady=6)
 
-    # ===== RĂSPUNS / FEEDBACK =====
+    # ===== RĂSPUNSURI =====
     def handle_answer(self, idx):
         correct, correct_text, explanation = self.quiz_manager.check_answer(idx)
         if self.mode == "exam":
@@ -222,15 +216,18 @@ class QuizApp(ctk.CTk):
         else:
             self.show_results()
 
-    # ===== FINAL QUIZ =====
+    # ===== REZULTATE =====
     def show_results(self):
         self.timer_running = False
         result = self.quiz_manager.get_result_data(self.mode, self.time_used)
         self.last_result = result
         add_session(result)
-        export_pdf_modern(result, self.quiz_manager.user_answers if self.mode == "train" else None)
-        self.clear_right_frame()
 
+        pdf_path = export_pdf_modern(result, self.quiz_manager.user_answers if self.mode == "train" else None)
+        if pdf_path:
+            messagebox.showinfo("Raport generat", f"Raportul PDF a fost salvat în:\n{pdf_path}")
+
+        self.clear_right_frame()
         ctk.CTkLabel(self.right_frame, text=f"Rezultat final: {result['percent']}%", font=("Segoe UI", 24, "bold"),
                      text_color="#00ffff").pack(pady=20)
         if self.mode == "train":
@@ -239,7 +236,6 @@ class QuizApp(ctk.CTk):
             self.show_exam_summary(result)
 
     def show_train_finish(self, result):
-        self.timer_running = False
         ctk.CTkLabel(self.right_frame, text="🏁 Antrenamentul s-a încheiat!", text_color="#00ff99",
                      font=("Segoe UI", 20, "bold")).pack(pady=10)
         ctk.CTkButton(self.right_frame, text="📄 Deschide PDF", fg_color="#1E5BA6",
@@ -256,16 +252,16 @@ class QuizApp(ctk.CTk):
         ctk.CTkButton(self.right_frame, text="⬅ Înapoi la meniu principal", fg_color="#1E5BA6",
                       command=self.reset_to_menu).pack(pady=20)
 
-    # ===== ALTE FUNCȚII =====
+    # ===== DIVERSE =====
     def manual_export_pdf(self):
         self.clear_right_frame()
         if not self.last_result:
             ctk.CTkLabel(self.right_frame, text="⚠️ Nu există o sesiune finalizată recent!",
                          text_color="#ff6666", font=("Segoe UI", 18, "bold")).pack(pady=20)
             return
-        export_pdf_modern(self.last_result)
-        ctk.CTkLabel(self.right_frame, text="📄 Raport PDF re-exportat cu succes!",
-                     text_color="#00ff99", font=("Segoe UI", 18, "bold")).pack(pady=30)
+        pdf_path = export_pdf_modern(self.last_result)
+        if pdf_path:
+            messagebox.showinfo("Raport generat", f"Raportul PDF a fost salvat în:\n{pdf_path}")
 
     def show_stats(self):
         stats = load_stats()
