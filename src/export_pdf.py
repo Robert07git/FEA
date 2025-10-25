@@ -1,82 +1,48 @@
-import os
 from fpdf import FPDF
-from datetime import datetime
+import os
 
 
 def export_quiz_pdf():
-    """
-    Generează un raport PDF cu istoricul scorurilor din score_history.txt.
-    Salvează fișierul în folderul 'reports'.
-    """
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    history_path = os.path.join(base_dir, "score_history.txt")
-    reports_dir = os.path.join(base_dir, "reports")
+    try:
+        pdf = FPDF()
+        pdf.add_page()
 
-    if not os.path.exists(history_path):
-        print("[INFO] Nu există score_history.txt — rulează măcar un quiz.")
-        return
+        # ✅ Înlocuim fontul implicit cu unul Unicode
+        # (vei adăuga fișierul TTF o singură dată)
+        font_path = os.path.join(os.path.dirname(__file__), "DejaVuSans.ttf")
 
-    if not os.path.exists(reports_dir):
-        os.makedirs(reports_dir)
+        if not os.path.exists(font_path):
+            # descarcă automat fontul dacă lipsește
+            import urllib.request
+            print("🔽 Se descarcă fontul DejaVuSans.ttf...")
+            urllib.request.urlretrieve(
+                "https://github.com/dejavu-fonts/dejavu-fonts/raw/version_2_37/ttf/DejaVuSans.ttf",
+                font_path
+            )
 
-    lines = []
-    with open(history_path, "r", encoding="utf-8") as f:
-        lines = [l.strip() for l in f.readlines() if l.strip()]
+        pdf.add_font("DejaVu", "", font_path, uni=True)
+        pdf.set_font("DejaVu", size=14)
 
-    if not lines:
-        print("[INFO] Fișierul score_history.txt este gol.")
-        return
+        pdf.cell(0, 10, "Raport FEA Quiz Trainer", ln=True, align="C")
+        pdf.set_font("DejaVu", size=11)
+        pdf.ln(10)
+        pdf.cell(0, 10, "Istoric performanță:", ln=True)
 
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
+        # citește istoricul dacă există
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        history_path = os.path.join(base_dir, "score_history.txt")
 
-    # Titlu mare
-    pdf.set_font("Arial", "B", 18)
-    pdf.set_text_color(0, 255, 255)
-    pdf.cell(0, 10, "FEA Quiz - Raport Rezultate", ln=True, align="C")
-    pdf.ln(10)
+        if os.path.exists(history_path):
+            with open(history_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            for line in lines[-15:]:
+                pdf.multi_cell(0, 8, line.strip())
+        else:
+            pdf.cell(0, 10, "Nu există date salvate în score_history.txt.", ln=True)
 
-    # Data generării
-    pdf.set_font("Arial", "", 12)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_fill_color(20, 20, 20)
-    pdf.cell(0, 10, f"Generat la: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
-    pdf.ln(5)
+        output_path = os.path.join(base_dir, "quiz_report.pdf")
+        pdf.output(output_path)
+        print(f"✅ PDF generat cu succes: {output_path}")
 
-    pdf.set_font("Arial", "B", 14)
-    pdf.set_text_color(0, 255, 100)
-    pdf.cell(0, 10, "Istoric performanță:", ln=True)
-    pdf.ln(5)
-
-    # Fundal gri închis
-    pdf.set_fill_color(30, 30, 30)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Arial", "", 11)
-
-    for line in lines[-20:]:  # ultimele 20 sesiuni
-        pdf.multi_cell(0, 8, line, border=0, align="L", fill=True)
-        pdf.ln(1)
-
-    pdf.ln(10)
-    pdf.set_font("Arial", "B", 12)
-    pdf.set_text_color(255, 255, 0)
-    pdf.cell(0, 10, "Interpretare:", ln=True)
-    pdf.set_font("Arial", "", 11)
-    pdf.set_text_color(255, 255, 255)
-    pdf.multi_cell(0, 8,
-        "Rezultatele de mai sus reflectă evoluția ta în timp. "
-        "Încearcă să crești consistența peste 80% în modul EXAM. "
-        "Pentru o învățare eficientă, analizează domeniile cu scor scăzut."
-    )
-
-    pdf.ln(10)
-    pdf.set_font("Arial", "I", 10)
-    pdf.set_text_color(180, 180, 180)
-    pdf.cell(0, 8, "FEA Quiz Trainer © 2025 — Mechanical Engineer Edition", ln=True, align="C")
-
-    filename = f"FEA_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    output_path = os.path.join(reports_dir, filename)
-    pdf.output(output_path)
-
-    print(f"[OK] Raport PDF generat cu succes: {output_path}")
+    except Exception as e:
+        print("❌ Eroare la export PDF:", e)
