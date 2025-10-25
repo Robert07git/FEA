@@ -1,7 +1,5 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import os
-import random
 from data_loader import load_questions, get_domains
 from quiz_logic import QuizSession
 from progress_chart import show_progress_chart
@@ -43,7 +41,7 @@ class QuizApp:
         self.num_questions_var = tk.IntVar(value=5)
         tk.Spinbox(self.root, from_=1, to=50, textvariable=self.num_questions_var, width=5).pack(pady=10)
 
-        # Mod (TRAIN / EXAM)
+        # Mod de testare
         tk.Label(self.root, text="Mod de testare:", bg="#111", fg="white", font=("Arial", 12)).pack(pady=(10, 0))
         self.mode_var = tk.StringVar(value="train")
 
@@ -60,9 +58,16 @@ class QuizApp:
         self.exam_btn = tk.Radiobutton(
             frame_modes, text="EXAM", variable=self.mode_var, value="exam",
             indicatoron=0, width=10, font=("Arial", 11, "bold"),
-            bg="#aa0000", fg="white", selectcolor="#ff3333", activebackground="#ff3333"
+            bg="#aa0000", fg="white", selectcolor="#ff3333", activebackground="#ff3333",
+            command=self.toggle_exam_time
         )
         self.exam_btn.pack(side="left", padx=10)
+
+        # Alegere timp (vizibil doar în modul EXAM)
+        self.exam_time_label = tk.Label(self.root, text="Timp per întrebare (secunde):", bg="#111", fg="white", font=("Arial", 12))
+        self.exam_time_spin = tk.Spinbox(self.root, from_=5, to=120, width=5)
+        self.exam_time_label.pack_forget()
+        self.exam_time_spin.pack_forget()
 
         # Buton START
         start_btn = tk.Button(
@@ -71,7 +76,7 @@ class QuizApp:
         )
         start_btn.pack(pady=30)
 
-        # Alte butoane - statistici, PDF etc.
+        # Alte butoane
         extras_frame = tk.Frame(self.root, bg="#111")
         extras_frame.pack(pady=15)
 
@@ -81,6 +86,15 @@ class QuizApp:
                   bg="#222", fg="white", command=show_progress_chart).pack(side="left", padx=5)
         tk.Button(extras_frame, text="Export PDF 📝", font=("Arial", 11),
                   bg="#222", fg="white", command=export_quiz_pdf).pack(side="left", padx=5)
+
+    def toggle_exam_time(self):
+        """Afișează câmpul pentru timp doar când e selectat modul EXAM"""
+        if self.mode_var.get() == "exam":
+            self.exam_time_label.pack()
+            self.exam_time_spin.pack(pady=5)
+        else:
+            self.exam_time_label.pack_forget()
+            self.exam_time_spin.pack_forget()
 
     def start_quiz(self):
         domain = self.domain_var.get()
@@ -92,11 +106,20 @@ class QuizApp:
             messagebox.showerror("Eroare", f"Nu există întrebări pentru domeniul '{domain}'.")
             return
 
-        session = QuizSession(self.root, questions, num_questions, mode)
-        session.run()
+        time_limit = None
+        if mode == "exam":
+            time_limit = int(self.exam_time_spin.get())
+
+        # Fereastră nouă pentru sesiunea de quiz
+        quiz_window = tk.Toplevel(self.root)
+        quiz_window.title(f"FEA Quiz Session - {domain.upper()}")
+        quiz_window.geometry("900x600")
+        quiz_window.configure(bg="#111")
+
+        QuizSession(quiz_window, questions, num_questions, mode, time_limit)
 
 
-# === SECȚIUNEA DE PORNIRE APLICAȚIE ===
+# === Pornirea aplicației ===
 if __name__ == "__main__":
     root = tk.Tk()
     app = QuizApp(root)
