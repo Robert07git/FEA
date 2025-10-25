@@ -13,22 +13,42 @@
     },
     {
       "subtitle": "3. Intruzie în habitaclu",
-      "content": "Măsurăm cât de mult pătrunde structura frontală în zona pasagerilor. Intruzia mare = risc crescut de rănire.",
+      "content": "Se măsoară cât de mult pătrunde structura frontală în zona pasagerilor. O intruzie mare indică un risc crescut de rănire.",
       "image": ""
     },
     {
-      "subtitle": "4. Manechin / dummy virtual",
-      "content": "Dummy-ul are senzori numerici. Putem estima accelerații, forțe pe torace, gât, genunchi. Scop: reducerea riscului de leziuni umane.",
+      "subtitle": "4. Manechin / Dummy virtual",
+      "content": "Dummy-urile au senzori numerici virtuali. Se estimează accelerații, forțe pe torace, gât, genunchi. Scopul: reducerea riscului de leziuni umane.",
       "image": ""
     },
     {
       "subtitle": "5. Rate de decelerație",
-      "content": "Un crash sever are decelerații foarte ridicate într-un timp foarte scurt. Aceste decelerații sunt corelate cu probabilitatea de vătămare.",
+      "content": "Un crash sever are decelerații foarte ridicate într-un timp scurt. Aceste valori sunt corelate cu probabilitatea de vătămare.",
       "image": ""
     },
     {
       "subtitle": "6. Contact și auto-contact",
-      "content": "În crash solverul urmărește sute/mii de contacte simultan: piese care se lovesc între ele, pliere tablă, coliziuni interne.",
+      "content": "În crash solver, se urmăresc mii de contacte simultane: piese care se lovesc între ele, pliere tablă, coliziuni interne.",
+      "image": ""
+    },
+    {
+      "subtitle": "7. Materiale cu comportament plastic",
+      "content": "Materialele au modele constitutive speciale (Johnson-Cook, Cowper-Symonds) care definesc comportamentul plastic și rata de deformație la impact.",
+      "image": ""
+    },
+    {
+      "subtitle": "8. Criterii de rănire (HIC, NIC, chest deflection)",
+      "content": "Pentru evaluarea siguranței pasagerilor, se calculează indicatori de rănire precum HIC (Head Injury Criterion) sau deflecția toracelui.",
+      "image": ""
+    },
+    {
+      "subtitle": "9. Validare experimentală",
+      "content": "Simulările se compară cu teste fizice (crash test dummies, accelerometre, camere de mare viteză) pentru calibrarea modelelor numerice.",
+      "image": ""
+    },
+    {
+      "subtitle": "10. Optimizare structurală în siguranță",
+      "content": "Analiza crash ajută la optimizarea designului structural: reducerea greutății și creșterea absorbției de energie prin materiale avansate.",
       "image": ""
     }
   ]
