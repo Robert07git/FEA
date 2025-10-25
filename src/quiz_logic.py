@@ -10,7 +10,7 @@ class QuizWindow(tk.Toplevel):
     def __init__(self, master, questions, mode="TRAIN", time_limit=None):
         super().__init__(master)
         self.title("FEA Quiz Session")
-        self.geometry("800x500")
+        self.geometry("900x550")
         self.configure(bg="#111")
 
         self.questions = questions
@@ -23,16 +23,17 @@ class QuizWindow(tk.Toplevel):
 
         self.alert_path = os.path.join(os.path.dirname(__file__), "alert.mp3")
 
+        # UI setup
         self.title_label = tk.Label(
-            self, text="FEA Quiz", font=("Segoe UI", 20, "bold"), bg="#111", fg="#00FFFF"
+            self, text="FEA Quiz", font=("Segoe UI", 22, "bold"), bg="#111", fg="#00FFFF"
         )
-        self.title_label.pack(pady=20)
+        self.title_label.pack(pady=15)
 
         self.question_label = tk.Label(
-            self, text="", wraplength=700, justify="center",
+            self, text="", wraplength=800, justify="center",
             font=("Segoe UI", 14), bg="#111", fg="white"
         )
-        self.question_label.pack(pady=30)
+        self.question_label.pack(pady=25)
 
         self.var_selected = tk.IntVar()
         self.radio_buttons = []
@@ -42,15 +43,15 @@ class QuizWindow(tk.Toplevel):
                 font=("Segoe UI", 12), bg="#111", fg="white",
                 selectcolor="#222", activebackground="#111"
             )
-            rb.pack(anchor="w", padx=150, pady=5)
+            rb.pack(anchor="w", padx=160, pady=4)
             self.radio_buttons.append(rb)
 
         self.next_button = tk.Button(
             self, text="Următoarea ➜", command=self.next_question,
             bg="#00FFFF", fg="black", font=("Segoe UI", 12, "bold"),
-            relief="flat", padx=15, pady=5
+            relief="flat", padx=20, pady=7
         )
-        self.next_button.pack(pady=30)
+        self.next_button.pack(pady=25)
 
         self.timer_label = tk.Label(
             self, text="", font=("Segoe UI", 12), bg="#111", fg="#00FFFF"
@@ -66,31 +67,42 @@ class QuizWindow(tk.Toplevel):
     def show_question(self):
         q = self.questions[self.current_index]
         self.var_selected.set(-1)
+
         self.question_label.config(
             text=f"Întrebarea {self.current_index + 1}/{len(self.questions)}:\n{q['question']}"
         )
-        opts = q.get("options", [])
+
+        choices = q.get("choices", [])
         for i in range(4):
-            if i < len(opts):
-                self.radio_buttons[i].config(text=opts[i], state="normal")
+            if i < len(choices):
+                self.radio_buttons[i].config(text=choices[i], state="normal")
             else:
                 self.radio_buttons[i].config(text="", state="disabled")
 
     def next_question(self):
         selected = self.var_selected.get()
         q = self.questions[self.current_index]
-        correct = q.get("correct", 0)
-        is_correct = selected == correct
+
+        correct_index = q.get("correct_index", 0)
+        explanation = q.get("explanation", "")
+        choices = q.get("choices", [])
+
+        is_correct = selected == correct_index
         self.user_answers.append((q["question"], is_correct))
+
         if is_correct:
             self.score += 1
             if self.mode == "TRAIN":
                 messagebox.showinfo("Corect!", "✅ Răspuns corect!")
-        elif self.mode == "TRAIN":
-            messagebox.showerror("Greșit", f"❌ Răspuns greșit!\nCorect era: {q['options'][correct]}")
+        else:
+            if self.mode == "TRAIN":
+                correct_answer = choices[correct_index] if correct_index < len(choices) else "N/A"
+                messagebox.showerror(
+                    "Greșit",
+                    f"❌ Răspuns greșit!\n\nCorect era: {correct_answer}\n\nExplicație: {explanation}"
+                )
 
         self.current_index += 1
-
         if self.current_index < len(self.questions):
             self.show_question()
         else:
@@ -120,12 +132,16 @@ class QuizWindow(tk.Toplevel):
 
         history_file = os.path.join(os.path.dirname(__file__), "score_history.txt")
         with open(history_file, "a", encoding="utf-8") as f:
-            f.write(f"{self.questions[0]['domain']},{self.mode},{total},{percentage:.1f}\n")
+            domain = self.questions[0].get("domain", "unknown")
+            f.write(f"{domain},{self.mode},{total},{percentage:.1f}\n")
 
         summary = (
             f"Rezultate finale:\n\nÎntrebări totale: {total}\n"
             f"Corecte: {correct}\nGreșite: {wrong}\n\n"
             f"Scor: {percentage:.1f}%"
         )
-        messagebox.showinfo("Rezumat", summary)
+
+        if self.mode == "EXAM":
+            messagebox.showinfo("Rezumat", summary)
+
         self.destroy()
