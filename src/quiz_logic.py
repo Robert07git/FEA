@@ -17,9 +17,9 @@ class QuizWindow(tk.Toplevel):
         self.time_limit = time_limit
         self.current = 0
         self.score = 0
-        self.running = True
+        self.running = False
         self.timer_thread = None
-        self.time_left = time_limit if time_limit else 0
+        self.time_left = 0
         self.selected_answer = tk.StringVar(value="")
         self.option_buttons = []
 
@@ -57,7 +57,7 @@ class QuizWindow(tk.Toplevel):
 
         self.feedback_label = tk.Label(self, text="", wraplength=750,
                                        font=("Segoe UI", 11, "italic"),
-                                       bg="#111", fg="#AAAAAA")
+                                       bg="#111", fg="#AAAAAA", justify="center")
         self.feedback_label.pack(pady=10)
 
         self.timer_label = tk.Label(self, text="", font=("Segoe UI", 12, "bold"),
@@ -114,6 +114,11 @@ class QuizWindow(tk.Toplevel):
             self.end_quiz()
             return
 
+        # Oprire timer anterior dacă există
+        self.running = False
+        if self.timer_thread and self.timer_thread.is_alive():
+            self.timer_thread.join(timeout=0.2)
+
         q = self.questions[self.current]
         total = len(self.questions)
         self.feedback_label.config(text="")
@@ -128,6 +133,7 @@ class QuizWindow(tk.Toplevel):
             self.running = True
             self.timer_thread = threading.Thread(target=self.countdown, daemon=True)
             self.timer_thread.start()
+            self.update_timer_display()
         else:
             self.timer_label.config(text="")
             self.progress_bar.config(width=0)
@@ -139,10 +145,13 @@ class QuizWindow(tk.Toplevel):
 
     # ----------------------------------------------------------
     def countdown(self):
+        """Rulează o singură dată per întrebare (thread separat)"""
         while self.running and self.time_left > 0:
-            mins, secs = divmod(self.time_left, 60)
-            self.timer_label.config(text=f"Timp rămas: {mins:02d}:{secs:02d}")
-            self.progress_bar.config(width=int((self.time_left / self.time_limit) * 400))
+            time.sleep(1)
+            self.time_left -= 1
+            self.update_timer_display()
+
+            # avertizare sonoră la 5 secunde
             if self.time_left == 5:
                 path = os.path.join(os.path.dirname(__file__), "alert.mp3")
                 if os.path.exists(path):
@@ -150,21 +159,33 @@ class QuizWindow(tk.Toplevel):
                         playsound(path, block=False)
                     except:
                         pass
-            time.sleep(1)
-            self.time_left -= 1
+
+        # când timpul s-a terminat
         if self.running and self.time_left <= 0:
-            self.timer_label.config(text="Timp expirat!")
-            self.progress_bar.config(width=0)
+            self.running = False
+            self.after(0, lambda: self.timer_label.config(text="Timp expirat!", fg="#FF5555"))
+            # adaugă o pauză vizuală de 1 sec înainte de întrebarea următoare
             self.after(1000, self.next_question)
 
     # ----------------------------------------------------------
+    def update_timer_display(self):
+        """actualizează bara și label-ul fără să repornească threadul"""
+        mins, secs = divmod(self.time_left, 60)
+        self.timer_label.config(text=f"Timp rămas: {mins:02d}:{secs:02d}", fg="#00FFFF")
+        if self.time_limit:
+            width = int((self.time_left / self.time_limit) * 400)
+            self.progress_bar.config(width=max(width, 0))
+
+    # ----------------------------------------------------------
     def next_question(self):
+        # Oprire timer curent dacă s-a apăsat manual pe "Următoarea"
+        self.running = False
+
         q = self.questions[self.current]
         user_ans = self.selected_answer.get()
         correct_ans = q["choices"][q["correct_index"]]
         explanation = q.get("explanation", "")
 
-        # reset feedback vizual
         for rb in self.option_buttons:
             rb.config(fg="white")
 
@@ -183,11 +204,11 @@ class QuizWindow(tk.Toplevel):
         self.current += 1
 
         if self.mode == "TRAIN":
-            # în TRAIN, așteptăm 2 secunde să citești feedbackul, apoi automat următoarea
+            # feedback + trece automat după 2.5s
             self.after(2500, self.show_question)
-        else:
-            # EXAM -> imediat următoarea
-            self.show_question()
+        elif self.mode == "EXAM":
+            # trece la următoarea întrebare (după feedback 1s, dacă e manual)
+            self.after(1000, self.show_question)
 
     # ----------------------------------------------------------
     def end_quiz(self):
