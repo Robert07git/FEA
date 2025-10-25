@@ -8,15 +8,22 @@ class QuizApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("FEA Quiz Trainer 2.5")
+        self.title("FEA Quiz Trainer 3.0 — Timer & Progress Edition")
         self.geometry("900x600")
         self.configure(fg_color="#202020")
 
+        # variabile interne
         self.quiz_manager = None
         self.mode = None
         self.progress_bar = None
         self.progress_label = None
+        self.timer_label = None
+        self.timer_bar = None
+        self.time_left = 0
+        self.timer_running = False
+        self.total_time = 0
 
+        # layout principal
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
@@ -76,12 +83,12 @@ class QuizApp(ctk.CTk):
         exit_btn.pack(side="bottom", pady=20)
 
     # ------------------------------------------------------------
-    #          Popup: selectare domeniu și număr întrebări
+    #          Popup: selectare domeniu + nr întrebări + timp
     # ------------------------------------------------------------
     def show_quiz_setup(self, mode):
         setup_win = ctk.CTkToplevel(self)
         setup_win.title("Configurare Quiz")
-        setup_win.geometry("400x300")
+        setup_win.geometry("400x350")
         setup_win.grab_set()
 
         ctk.CTkLabel(setup_win, text="Alege domeniul:", font=("Segoe UI", 14, "bold")).pack(pady=10)
@@ -96,14 +103,23 @@ class QuizApp(ctk.CTk):
         num_entry = ctk.CTkEntry(setup_win, textvariable=num_var, width=100, justify="center")
         num_entry.pack(pady=5)
 
+        ctk.CTkLabel(setup_win, text="Timp total (minute):", font=("Segoe UI", 14, "bold")).pack(pady=10)
+        time_var = ctk.StringVar(value="2")
+        time_entry = ctk.CTkEntry(setup_win, textvariable=time_var, width=100, justify="center")
+        time_entry.pack(pady=5)
+
         def confirm():
             domain = domain_var.get()
             try:
                 num = int(num_var.get())
             except ValueError:
                 num = None
+            try:
+                time_min = int(time_var.get())
+            except ValueError:
+                time_min = 1
             setup_win.destroy()
-            self.start_quiz(mode, domain, num)
+            self.start_quiz(mode, domain, num, time_min)
 
         start_btn = ctk.CTkButton(setup_win, text="Start Quiz", command=confirm, fg_color="#1E5BA6")
         start_btn.pack(pady=20)
@@ -111,7 +127,7 @@ class QuizApp(ctk.CTk):
     # ------------------------------------------------------------
     #                     Începerea quizului
     # ------------------------------------------------------------
-    def start_quiz(self, mode, domain, num_questions):
+    def start_quiz(self, mode, domain, num_questions, time_min):
         self.clear_right_frame()
 
         data_path = os.path.join("data", "fea_questions.json")
@@ -120,15 +136,62 @@ class QuizApp(ctk.CTk):
 
         self.quiz_manager = QuizManagerModern(questions, domain=domain, num_questions=num_questions)
         self.mode = mode
+
+        # timer
+        self.time_left = time_min * 60
+        self.total_time = self.time_left
+        self.timer_running = True
+
         self.load_quiz()
+        self.update_timer()
 
     def load_quiz(self):
         self.clear_right_frame()
+        self.create_timer_section()
         self.create_progress_bar()
         self.show_question()
 
     # ------------------------------------------------------------
-    #              Bară de progres + afișare întrebare
+    #              Timer (numeric + bară colorată)
+    # ------------------------------------------------------------
+    def create_timer_section(self):
+        self.timer_label = ctk.CTkLabel(self.right_frame, text="", font=("Segoe UI", 16, "bold"), text_color="#00ffff")
+        self.timer_label.pack(pady=(10, 0))
+
+        self.timer_bar = ctk.CTkProgressBar(self.right_frame, width=400, height=10)
+        self.timer_bar.pack(pady=(5, 10))
+        self.timer_bar.set(1.0)  # start cu bara plină
+
+    def update_timer(self):
+        if not self.timer_running:
+            return
+
+        mins, secs = divmod(self.time_left, 60)
+        self.timer_label.configure(text=f"Timp rămas: {mins:02d}:{secs:02d}")
+
+        # actualizare bară colorată
+        progress = self.time_left / self.total_time
+        self.timer_bar.set(progress)
+
+        # schimbare culoare în funcție de progres
+        if progress > 0.6:
+            color = "#00cc66"  # verde
+        elif progress > 0.3:
+            color = "#ffcc00"  # galben
+        else:
+            color = "#ff4444"  # roșu
+        self.timer_bar.configure(progress_color=color)
+
+        if self.time_left <= 0:
+            self.timer_running = False
+            self.show_results()
+            return
+
+        self.time_left -= 1
+        self.after(1000, self.update_timer)
+
+    # ------------------------------------------------------------
+    #              Bară de progres pentru întrebări
     # ------------------------------------------------------------
     def create_progress_bar(self):
         self.progress_label = ctk.CTkLabel(self.right_frame, text="", font=("Segoe UI", 14))
@@ -145,13 +208,16 @@ class QuizApp(ctk.CTk):
         self.progress_bar.set(progress)
         self.progress_label.configure(text=f"Întrebarea {current}/{total}")
 
+    # ------------------------------------------------------------
+    #                     Întrebări și răspunsuri
+    # ------------------------------------------------------------
     def show_question(self):
         q = self.quiz_manager.get_current_question()
         if not q:
             self.show_results()
             return
 
-        self.clear_right_frame(keep_progress=True)
+        self.clear_right_frame(keep_progress=True, keep_timer=True)
         self.update_progress()
 
         question_label = ctk.CTkLabel(
@@ -178,18 +244,13 @@ class QuizApp(ctk.CTk):
             )
             btn.pack(pady=8)
 
-    # ------------------------------------------------------------
-    #                     Răspunsuri și rezultate
-    # ------------------------------------------------------------
     def handle_answer(self, idx):
         correct, correct_text, explanation = self.quiz_manager.check_answer(idx)
         if self.mode == "exam":
-            # fără feedback imediat
             self.next_question()
             return
 
-        # feedback instant (train mode)
-        self.clear_right_frame(keep_progress=True)
+        self.clear_right_frame(keep_progress=True, keep_timer=True)
         self.update_progress()
 
         result_text = "✅ Corect!" if correct else "❌ Greșit!"
@@ -208,8 +269,13 @@ class QuizApp(ctk.CTk):
         else:
             self.show_results()
 
+    # ------------------------------------------------------------
+    #                     Rezultate finale
+    # ------------------------------------------------------------
     def show_results(self):
+        self.timer_running = False
         self.clear_right_frame()
+
         total = self.quiz_manager.total_questions()
         score = self.quiz_manager.score
         percent = round(score / total * 100, 1)
@@ -234,14 +300,13 @@ class QuizApp(ctk.CTk):
     # ------------------------------------------------------------
     #                   Utility
     # ------------------------------------------------------------
-    def clear_right_frame(self, keep_progress=False):
-        if keep_progress:
-            for widget in self.right_frame.winfo_children():
-                if widget not in [self.progress_bar, self.progress_label]:
-                    widget.destroy()
-        else:
-            for widget in self.right_frame.winfo_children():
-                widget.destroy()
+    def clear_right_frame(self, keep_progress=False, keep_timer=False):
+        for widget in self.right_frame.winfo_children():
+            if keep_progress and widget in [self.progress_bar, self.progress_label]:
+                continue
+            if keep_timer and widget in [self.timer_label, self.timer_bar]:
+                continue
+            widget.destroy()
 
     # ------------------------------------------------------------
     #                 Placeholder pentru alte secțiuni
