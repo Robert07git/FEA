@@ -1,34 +1,59 @@
-import os
 import tkinter as tk
 from tkinter import ttk
+import os
 
-def show_dashboard():
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    hist_path = os.path.join(base_dir, "score_history.txt")
-    if not os.path.exists(hist_path):
-        raise FileNotFoundError("Nu există score_history.txt – rulează câteva quiz-uri înainte.")
+# Această funcție se integrează cu GUI-ul principal (FEAQuizApp)
+def show_stats():
+    # Verifică dacă există fișierul cu istoricul scorurilor
+    history_file = os.path.join(os.path.dirname(__file__), "score_history.txt")
+    if not os.path.exists(history_file):
+        tk.messagebox.showinfo("Statistici", "Nu există date salvate despre sesiuni anterioare.")
+        return
 
-    data = []
-    with open(hist_path, "r", encoding="utf-8") as f:
-        for line in f:
-            p = [x.strip() for x in line.split("|")]
-            if len(p) >= 5:
-                data.append(p)
+    # Creează o fereastră separată
+    stats_win = tk.Toplevel()
+    stats_win.title("Statistici generale")
+    stats_win.geometry("600x400")
+    stats_win.configure(bg="#111")
 
-    win = tk.Toplevel()
-    win.title("Statistici Performanță")
-    win.geometry("650x400")
-    tree = ttk.Treeview(win, columns=("Domeniu", "Mod", "Scor", "Procent"), show="headings")
+    title = tk.Label(
+        stats_win,
+        text="📊 Rezumat sesiuni anterioare",
+        font=("Segoe UI", 14, "bold"),
+        fg="#00FFFF",
+        bg="#111",
+    )
+    title.pack(pady=10)
+
+    # Creează un Treeview pentru a afișa datele
+    tree = ttk.Treeview(stats_win, columns=("Domeniu", "Mod", "Întrebări", "Scor"), show="headings")
     tree.heading("Domeniu", text="Domeniu")
     tree.heading("Mod", text="Mod")
-    tree.heading("Scor", text="Scor")
-    tree.heading("Procent", text="Procent (%)")
+    tree.heading("Întrebări", text="Întrebări totale")
+    tree.heading("Scor", text="Scor (%)")
+    tree.pack(expand=True, fill="both", padx=20, pady=10)
 
-    for entry in data[-10:]:
-        dom = entry[1].split("=")[1]
-        mod = entry[2].split("=")[1]
-        scor = entry[3].split("=")[1]
-        pct = entry[4].split("=")[1]
-        tree.insert("", "end", values=(dom, mod, scor, pct))
+    # Încarcă datele din fișier
+    with open(history_file, "r", encoding="utf-8") as f:
+        lines = f.readlines()
 
-    tree.pack(fill="both", expand=True, padx=10, pady=10)
+    for line in lines:
+        try:
+            domain, mode, total, score = line.strip().split(",")
+            tree.insert("", "end", values=(domain, mode, total, score))
+        except ValueError:
+            continue
+
+    # Buton de închidere
+    close_btn = tk.Button(
+        stats_win,
+        text="Închide",
+        command=stats_win.destroy,
+        bg="#00FFFF",
+        fg="black",
+        font=("Segoe UI", 11, "bold"),
+        relief="flat",
+        padx=10,
+        pady=5,
+    )
+    close_btn.pack(pady=10)
