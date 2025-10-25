@@ -1,25 +1,44 @@
-from fpdf import FPDF
 import os
-import time
+from fpdf import FPDF
+from datetime import datetime
 
 def generate_exam_report():
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    hist_path = os.path.join(base_dir, "score_history.txt")
-    out_path = os.path.join(base_dir, f"Exam_Report_{time.strftime('%Y%m%d_%H%M')}.pdf")
+    file_path = os.path.join(os.path.dirname(__file__), "score_history.txt")
+    if not os.path.exists(file_path):
+        print("Nu există date pentru export.")
+        return
 
-    if not os.path.exists(hist_path):
-        raise FileNotFoundError("Nu există score_history.txt pentru a genera PDF-ul.")
+    with open(file_path, "r", encoding="utf-8") as f:
+        lines = [l.strip() for l in f.readlines() if l.strip()]
+        if not lines:
+            print("Nicio sesiune disponibilă.")
+            return
+        last_session = lines[-1].split(",")
+
+    if len(last_session) < 4:
+        print("Format invalid în istoricul scorurilor.")
+        return
+
+    domain, mode, total, score = last_session
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
-    pdf.cell(200, 10, "FEA Exam Report", ln=True, align="C")
-    pdf.ln(10)
+    pdf.cell(0, 10, "FEA Quiz - Raport sesiune", ln=True, align="C")
+
     pdf.set_font("Arial", "", 12)
+    pdf.ln(10)
+    pdf.cell(0, 10, f"Data generării: {now}", ln=True)
+    pdf.cell(0, 10, f"Domeniu: {domain}", ln=True)
+    pdf.cell(0, 10, f"Mod: {mode}", ln=True)
+    pdf.cell(0, 10, f"Întrebări totale: {total}", ln=True)
+    pdf.cell(0, 10, f"Scor obținut: {score}%", ln=True)
 
-    with open(hist_path, "r", encoding="utf-8") as f:
-        for line in f:
-            pdf.multi_cell(0, 8, txt=line.strip())
+    pdf.ln(10)
+    pdf.set_font("Arial", "I", 10)
+    pdf.multi_cell(0, 10, "Felicitări pentru progres! Continuă să exersezi în mod regulat pentru a-ți consolida cunoștințele în FEA și simulare numerică.")
 
-    pdf.output(out_path)
-    print(f"✅ Raport PDF salvat: {out_path}")
+    pdf_path = os.path.join(os.path.dirname(__file__), f"Raport_FEA_{domain}_{mode}.pdf")
+    pdf.output(pdf_path)
+    print(f"PDF generat: {pdf_path}")
