@@ -1,74 +1,50 @@
 import json
 import os
-from tkinter import messagebox
+import random
 
 
-def load_questions(domain="mix"):
+def load_questions(domain=None):
     """
     Încarcă întrebările din fișierul data/fea_questions.json.
-    Dacă domeniul = "mix", le combină pe toate.
-    Returnează o listă de întrebări validate.
+    Poate încărca întrebările doar pentru un domeniu sau mixate.
     """
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     data_path = os.path.join(base_dir, "data", "fea_questions.json")
 
     if not os.path.exists(data_path):
-        messagebox.showerror("Eroare", f"Fișierul {os.path.basename(data_path)} nu a fost găsit!")
+        print(f"[Eroare] Fișierul {data_path} nu există!")
         return []
 
     try:
         with open(data_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except json.JSONDecodeError as e:
-        messagebox.showerror("Eroare JSON", f"Format invalid în {data_path}.\n{e}")
+            all_questions = json.load(f)
+    except Exception as e:
+        print(f"[Eroare] Nu s-au putut încărca întrebările: {e}")
         return []
 
-    # Verificăm dacă fișierul conține domenii valide
-    if not isinstance(data, dict):
-        messagebox.showerror("Eroare", "Fișierul JSON nu are structură validă (dict pe domenii).")
-        return []
+    # Dacă s-a cerut un domeniu anume
+    if domain and domain.lower() != "mix":
+        domain_questions = [q for q in all_questions if q["domain"].lower() == domain.lower()]
+        if not domain_questions:
+            print(f"[Avertisment] Nu există întrebări pentru domeniul '{domain}'. Se folosește MIX.")
+            return all_questions
+        return domain_questions
 
-    all_questions = []
-
-    if domain.lower() == "mix":
-        for domeniu, lista in data.items():
-            all_questions.extend(validate_questions(lista, domeniu))
-    else:
-        domeniu = domain.lower()
-        if domeniu in data:
-            all_questions = validate_questions(data[domeniu], domeniu)
-        else:
-            messagebox.showwarning("Avertisment", f"Domeniul '{domeniu}' nu a fost găsit în fișierul JSON.")
-            return []
-
-    if not all_questions:
-        messagebox.showwarning("Avertisment", "Nu există întrebări valide în fișierul JSON pentru acest domeniu.")
-        return []
-
+    # Domeniu = mix → toate întrebările combinate
     return all_questions
 
 
-def validate_questions(questions, domain_name):
+def get_domains():
     """
-    Verifică și structurează întrebările.
+    Returnează lista domeniilor disponibile din fișierul JSON.
     """
-    valid = []
-    for q in questions:
-        if not all(k in q for k in ("question", "options", "correct")):
-            continue
-        if not isinstance(q["options"], list) or len(q["options"]) < 2:
-            continue
-        try:
-            correct_index = int(q["correct"])
-        except ValueError:
-            continue
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_path = os.path.join(base_dir, "data", "fea_questions.json")
 
-        q_struct = {
-            "domain": domain_name,
-            "question": q["question"].strip(),
-            "options": q["options"],
-            "correct": correct_index,
-            "explanation": q.get("explanation", "")
-        }
-        valid.append(q_struct)
-    return valid
+    try:
+        with open(data_path, "r", encoding="utf-8") as f:
+            all_questions = json.load(f)
+        domains = sorted(list(set(q["domain"].lower() for q in all_questions)))
+        return domains
+    except Exception:
+        return []
