@@ -1,11 +1,11 @@
 # ui_modern.py
 import customtkinter as ctk
 from tkinter import messagebox
-import time
-from data_loader import load_questions  # <- importăm din fișierul existent
-from quiz_logic import QuizManager       # <- clasa care gestionează quiz-ul
+from data_loader import load_questions
+from quiz_engine_modern import QuizManagerModern
 
 
+# === Setări generale de interfață ===
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
@@ -21,6 +21,7 @@ class FEAQuizApp(ctk.CTk):
         self.geometry("950x650")
         self.resizable(False, False)
 
+        # container pentru toate frame-urile
         self.container = ctk.CTkFrame(self, corner_radius=0)
         self.container.pack(fill="both", expand=True)
 
@@ -33,6 +34,7 @@ class FEAQuizApp(ctk.CTk):
         self.show_frame("MainMenuFrame")
 
     def show_frame(self, frame_name):
+        """Afișează un frame (ecran) după nume."""
         frame = self.frames[frame_name]
         frame.tkraise()
 
@@ -49,15 +51,22 @@ class MainMenuFrame(ctk.CTkFrame):
         main_container = ctk.CTkFrame(self)
         main_container.pack(expand=True)
 
-        title = ctk.CTkLabel(main_container, text="FEA QUIZ TRAINER",
-                             font=("Poppins", 32, "bold"), text_color="#00E6E6")
+        title = ctk.CTkLabel(
+            main_container,
+            text="FEA QUIZ TRAINER",
+            font=("Poppins", 32, "bold"),
+            text_color="#00E6E6"
+        )
         title.pack(pady=(10, 30))
 
         button_style = {
-            "width": 260, "height": 45, "corner_radius": 12,
+            "width": 260,
+            "height": 45,
+            "corner_radius": 12,
             "font": ("Poppins", 16, "bold")
         }
 
+        # butoanele principale
         buttons = [
             ("🎯 TRAIN MODE", lambda: self.start_quiz("train")),
             ("🧾 EXAM MODE", lambda: self.start_quiz("exam")),
@@ -71,17 +80,25 @@ class MainMenuFrame(ctk.CTkFrame):
         for text, command in buttons:
             ctk.CTkButton(main_container, text=text, command=command, **button_style).pack(pady=8)
 
-        ctk.CTkButton(main_container, text="⏻ IEȘIRE", fg_color="#CC0000",
-                      hover_color="#990000", command=self.controller.destroy,
-                      width=180, height=40, font=("Poppins", 14, "bold")).pack(pady=(35, 10))
+        # buton de ieșire
+        ctk.CTkButton(
+            main_container,
+            text="⏻ IEȘIRE",
+            fg_color="#CC0000",
+            hover_color="#990000",
+            command=self.controller.destroy,
+            width=180,
+            height=40,
+            font=("Poppins", 14, "bold")
+        ).pack(pady=(35, 10))
 
     def start_quiz(self, mode):
-        """Deschide quiz-ul real."""
+        """Deschide ecranul de quiz (TRAIN sau EXAM)."""
         frame = self.controller.frames["QuizFrame"]
         frame.load_quiz(mode)
         self.controller.show_frame("QuizFrame")
 
-    # Funcții temporare
+    # funcții temporare (pentru alte secțiuni)
     def open_stats(self): messagebox.showinfo("Statistici", "Secțiune în dezvoltare.")
     def open_chart(self): messagebox.showinfo("Grafic progres", "Secțiune în dezvoltare.")
     def learn_mode(self): messagebox.showinfo("Learn Mode", "Secțiune în dezvoltare.")
@@ -90,80 +107,143 @@ class MainMenuFrame(ctk.CTkFrame):
 
 
 # ==============================================================
-#                       ECRAN QUIZ (TRAIN / EXAM)
+#                      ECRAN QUIZ (TRAIN / EXAM)
 # ==============================================================
 
 class QuizFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
-        self.quiz = None
-        self.mode = None
-        self.current_question = 0
 
-        self.question_label = ctk.CTkLabel(self, text="", font=("Poppins", 20, "bold"), wraplength=800)
+        self.quiz = None
+        self.mode = None  # "train" sau "exam"
+
+        # Titlu / întrebare
+        self.question_label = ctk.CTkLabel(
+            self,
+            text="",
+            font=("Poppins", 20, "bold"),
+            wraplength=800,
+            justify="left"
+        )
         self.question_label.pack(pady=(40, 20))
 
+        # Butoane pentru răspunsuri
         self.option_buttons = []
         for i in range(4):
-            btn = ctk.CTkButton(self, text="", width=400, height=40,
-                                font=("Poppins", 14), command=lambda i=i: self.check_answer(i))
+            btn = ctk.CTkButton(
+                self,
+                text="",
+                width=500,
+                height=40,
+                font=("Poppins", 14),
+                command=lambda i=i: self.check_answer(i)
+            )
             btn.pack(pady=5)
             self.option_buttons.append(btn)
 
-        self.progress_label = ctk.CTkLabel(self, text="", font=("Poppins", 14))
-        self.progress_label.pack(pady=10)
+        # Status (scor / progres)
+        self.progress_label = ctk.CTkLabel(
+            self,
+            text="",
+            font=("Poppins", 14)
+        )
+        self.progress_label.pack(pady=15)
 
-        self.next_button = ctk.CTkButton(self, text="Următoarea ➜", command=self.next_question,
-                                         width=180, height=40, font=("Poppins", 14, "bold"))
-        self.next_button.pack(pady=20)
+        # Buton "Următoarea"
+        self.next_button = ctk.CTkButton(
+            self,
+            text="Următoarea ➜",
+            command=self.next_question,
+            width=180,
+            height=40,
+            font=("Poppins", 14, "bold")
+        )
+        self.next_button.pack(pady=(10, 20))
 
-        self.back_button = ctk.CTkButton(self, text="⟵ Înapoi la meniu", command=self.go_back,
-                                         fg_color="#444", hover_color="#666",
-                                         width=180, height=40, font=("Poppins", 14, "bold"))
-        self.back_button.pack(pady=10)
+        # Buton "Înapoi la meniu"
+        self.back_button = ctk.CTkButton(
+            self,
+            text="⟵ Înapoi la meniu",
+            fg_color="#444",
+            hover_color="#666",
+            command=self.go_back,
+            width=180,
+            height=40,
+            font=("Poppins", 14, "bold")
+        )
+        self.back_button.pack(pady=(10, 20))
+
 
     def load_quiz(self, mode):
-        """Încarcă întrebările și inițializează quiz-ul."""
+        """Se apelează când utilizatorul apasă TRAIN/EXAM din meniu."""
         self.mode = mode
-        questions = load_questions("mix")  # poți schimba domeniul default
-        self.quiz = QuizManager(questions)
-        self.current_question = 0
+        questions = load_questions("mix")  # Domeniu implicit (deocamdată)
+        self.quiz = QuizManagerModern(questions)
         self.show_question()
 
-    def show_question(self):
-        """Afișează întrebarea curentă."""
-        q = self.quiz.questions[self.current_question]
-        self.question_label.configure(text=f"{self.current_question + 1}/{len(self.quiz.questions)}: {q['question']}")
 
-        for i, opt in enumerate(q['options']):
-            self.option_buttons[i].configure(text=opt, state="normal")
+    def show_question(self):
+        """Afișează întrebarea curentă și opțiunile."""
+        q = self.quiz.get_current_question()
+        if q is None:
+            self.finish_quiz()
+            return
+
+        idx_curent = self.quiz.current_index + 1
+        total = self.quiz.total_questions()
+        self.question_label.configure(
+            text=f"Întrebarea {idx_curent}/{total}:\n\n{q['question']}"
+        )
+
+        for i, btn in enumerate(self.option_buttons):
+            if i < len(q["options"]):
+                btn.configure(text=q["options"][i], state="normal")
+                btn.pack(pady=5)
+            else:
+                btn.pack_forget()
 
         self.progress_label.configure(text=f"Scor curent: {self.quiz.score}")
+        self.next_button.configure(state="disabled")
 
-    def check_answer(self, index):
+
+    def check_answer(self, selected_index):
         """Verifică răspunsul selectat."""
-        q = self.quiz.questions[self.current_question]
-        correct = q["answer_index"] == index
+        is_correct, correct_text, explanation = self.quiz.check_answer(selected_index)
 
-        if correct:
-            self.quiz.score += 1
-            messagebox.showinfo("Corect ✅", "Bravo! Răspuns corect.")
-        else:
-            messagebox.showerror("Greșit ❌", f"Răspuns greșit.\nCorect: {q['options'][q['answer_index']]}")
-
+        # dezactivăm butoanele după alegere
         for btn in self.option_buttons:
             btn.configure(state="disabled")
 
+        if self.mode == "train":
+            # feedback imediat
+            feedback_msg = "✔ Corect!\n\n" if is_correct else "✘ Greșit.\n\n"
+            feedback_msg += f"Răspuns corect: {correct_text}"
+            if explanation:
+                feedback_msg += f"\nExplicație: {explanation}"
+            messagebox.showinfo("Feedback", feedback_msg)
+
+        # activăm butonul "Următoarea"
+        self.next_button.configure(state="normal")
+
+
     def next_question(self):
         """Trece la următoarea întrebare."""
-        if self.current_question < len(self.quiz.questions) - 1:
-            self.current_question += 1
+        more = self.quiz.advance()
+        if more:
             self.show_question()
         else:
-            messagebox.showinfo("Quiz terminat 🎯",
-                                f"Scor final: {self.quiz.score}/{len(self.quiz.questions)}")
-            self.go_back()
+            self.finish_quiz()
+
+
+    def finish_quiz(self):
+        """Afișează scorul final."""
+        total = self.quiz.total_questions()
+        score = self.quiz.score
+        percent = (score / total) * 100 if total > 0 else 0
+        messagebox.showinfo("Quiz terminat 🎯", f"Scor final: {score}/{total} ({percent:.1f}%)")
+        self.go_back()
+
 
     def go_back(self):
         """Revenire la meniu."""
@@ -171,7 +251,7 @@ class QuizFrame(ctk.CTkFrame):
 
 
 # ==============================================================
-#                     RULARE APLICAȚIE
+#                      RULARE APLICAȚIE
 # ==============================================================
 
 if __name__ == "__main__":
