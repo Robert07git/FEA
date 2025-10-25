@@ -1,10 +1,7 @@
 # quiz_engine_modern.py
 """
-Logică modernă pentru FEA Quiz Trainer — compatibilă cu structura fea_questions.json,
-cu suport pentru:
-- filtrare pe domeniu
-- limitare număr întrebări
-- colectare răspunsuri utilizator pentru feedback la final (Exam Mode)
+Logica modernă pentru FEA Quiz Trainer
+Compatibilă cu versiunea 3.5 (Statistici & Leaderboard)
 """
 
 import random
@@ -45,6 +42,9 @@ class QuizManagerModern:
 
         # pentru analiză la final (mai ales în Exam Mode)
         self.user_answers = []  # list[ {question, user_answer, correct_answer, is_correct, explanation} ]
+
+        # reținem domeniul pentru raport
+        self.domain = domain
 
     # ------------------ info despre progres ------------------
 
@@ -110,3 +110,26 @@ class QuizManagerModern:
         """
         self.current_index += 1
         return self.current_index < len(self.questions)
+
+    # ------------------ raport pentru statistici ------------------
+
+    def get_result_data(self, mode, time_used):
+        """
+        Returnează un dict cu toate datele despre sesiune,
+        pentru salvare în stats.json / leaderboard / PDF.
+        """
+        total = len(self.questions)
+        percent = round((self.score / total) * 100, 2) if total > 0 else 0.0
+        correct = self.score
+        incorrect = total - correct
+
+        return {
+            "mode": mode,
+            "domain": self.domain,
+            "score": self.score,
+            "total": total,
+            "percent": percent,
+            "time_used": time_used,
+            "correct": correct,
+            "incorrect": incorrect,
+        }
