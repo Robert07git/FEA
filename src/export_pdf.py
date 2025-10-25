@@ -31,7 +31,10 @@ def export_quiz_pdf():
             if lines:
                 for line in lines[-15:]:
                     clean_line = remove_diacritics(line.strip())
-                    pdf.multi_cell(0, 8, clean_line)
+
+                    # ✅ Siguranță: taie textul prea lung în linii de max. 180mm
+                    pdf.multi_cell(180, 8, clean_line)
+                    pdf.ln(1)
             else:
                 pdf.cell(0, 10, "Fisierul score_history.txt este gol.", ln=True)
         else:
