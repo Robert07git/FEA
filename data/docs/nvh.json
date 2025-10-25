@@ -1,0 +1,55 @@
+{
+  "title": "NVH (Noise, Vibration, Harshness)",
+  "sections": [
+    {
+      "subtitle": "1. Ce înseamnă NVH?",
+      "content": "NVH înseamnă zgomot, vibrație și asprime percepută. Scopul e confortul acustic și vibrațional al utilizatorului.",
+      "image": "images/nvh/nvh_mode_shape.png"
+    },
+    {
+      "subtitle": "2. Moduri proprii (modal analysis)",
+      "content": "O structură are forme proprii de vibrație. Analiza modală îți spune la ce frecvențe începe să vibreze și cum arată forma acelei vibrații.",
+      "image": "images/nvh/nvh_modal_mesh.png"
+    },
+    {
+      "subtitle": "3. Răspuns la excitație",
+      "content": "Poți excita un punct cu o forță și vezi cât de mult vibrează diferite zone. Zonele cu amplitudă mare pot genera zgomot sau senzații neplăcute.",
+      "image": ""
+    },
+    {
+      "subtitle": "4. Transfer acustic",
+      "content": "Se poate calcula cum vibrația structurală se transformă în presiune acustică în cabină / în exterior.",
+      "image": ""
+    },
+    {
+      "subtitle": "5. Damping",
+      "content": "Materialele și tratamentele fonoabsorbante cresc amortizarea vibrațiilor și reduc zgomotul radiat.",
+      "image": ""
+    },
+    {
+      "subtitle": "6. Puncte de fixare (mounts)",
+      "content": "Calea prin care motorul sau alte surse introduc vibrații în structură depinde mult de cum sunt fixate.",
+      "image": ""
+    },
+    {
+      "subtitle": "7. Complaints subiective",
+      "content": "Termeni ca 'bâzâit', 'huruit', 'vibrează bordul' devin obiectivi prin măsurarea frecvenței și amplitudinii vibrației.",
+      "image": ""
+    },
+    {
+      "subtitle": "8. Corelare test-simulare",
+      "content": "Modelele numerice se calibrează în funcție de măsurători reale pe prototip. Scopul: simulare să prezică ce simte clientul.",
+      "image": ""
+    },
+    {
+      "subtitle": "9. Tuning",
+      "content": "Mici modificări la rigiditate, masă, poziție suporturi pot schimba drastic o frecvență proprie și pot elimina zgomote.",
+      "image": ""
+    },
+    {
+      "subtitle": "10. Rezultatul final",
+      "content": "NVH bun = mașină / produs care pare solid, fără vibrații supărătoare, fără sunete metalice, fără rezonanțe evidente.",
+      "image": ""
+    }
+  ]
+}
