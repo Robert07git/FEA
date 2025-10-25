@@ -1,96 +1,55 @@
 # quiz_engine_modern.py
 """
-Logica modernă pentru FEA Quiz Trainer
-Compatibilă cu versiunea 3.5 (Statistici & Leaderboard)
+Logica pentru FEA Quiz Trainer 3.6 — corectă și sincronizată cu noua interfață
 """
 
 import random
+from datetime import datetime
 
 
 class QuizManagerModern:
-    """Gestionează logica quizului (întrebări, scor, progres)."""
+    """Gestionează întrebările, scorul, progresul și feedback-ul."""
 
     def __init__(self, questions, domain="mix", num_questions=None):
-        """
-        questions: list[dict] fiecare dict trebuie să aibă cheile:
-           "question": str
-           "choices": list[str]
-           "correct_index": int
-           "explanation": str (optional)
-           "domain": str (ex: "structural", "crash", etc.)
-        domain: str - "mix" sau un nume de domeniu
-        num_questions: int sau None
-        """
-
-        # 1. Filtrăm întrebările după domeniu, dacă nu e 'mix'
         if domain and domain.lower() != "mix":
             questions = [
                 q for q in questions
                 if q.get("domain", "").lower() == domain.lower()
             ]
 
-        # 2. Amestecăm ordinea întrebărilor
         random.shuffle(questions)
-
-        # 3. Limităm numărul de întrebări
         if num_questions is not None and num_questions > 0:
             questions = questions[:num_questions]
 
         self.questions = questions
         self.current_index = 0
         self.score = 0
-
-        # pentru analiză la final (mai ales în Exam Mode)
-        self.user_answers = []  # list[ {question, user_answer, correct_answer, is_correct, explanation} ]
-
-        # reținem domeniul pentru raport
+        self.user_answers = []
         self.domain = domain
 
-    # ------------------ info despre progres ------------------
-
+    # ----------------- INFO -----------------
     def total_questions(self):
-        """Returnează numărul total de întrebări din sesiune."""
         return len(self.questions)
 
     def get_current_question(self):
-        """Returnează întrebarea curentă (dict) sau None dacă nu mai sunt întrebări."""
         if self.current_index < len(self.questions):
             return self.questions[self.current_index]
         return None
 
-    # ------------------ răspunsuri ------------------
-
+    # ----------------- RĂSPUNS -----------------
     def check_answer(self, selected_index: int):
-        """
-        Verifică răspunsul utilizatorului.
-        Returnează (is_correct, correct_text, explanation).
-        Înregistrează răspunsul pentru raportul final.
-        """
         q = self.questions[self.current_index]
-
         options = q.get("choices", [])
         correct_index = q.get("correct_index", 0)
         explanation = q.get("explanation", "")
 
         is_correct = (selected_index == correct_index)
+        correct_text = options[correct_index] if 0 <= correct_index < len(options) else "-"
+        user_text = options[selected_index] if 0 <= selected_index < len(options) else "-"
 
-        # Textul răspunsului corect
-        if 0 <= correct_index < len(options):
-            correct_text = options[correct_index]
-        else:
-            correct_text = "—"
-
-        # Textul răspunsului dat de utilizator
-        if 0 <= selected_index < len(options):
-            user_text = options[selected_index]
-        else:
-            user_text = "—"
-
-        # Scor
         if is_correct:
             self.score += 1
 
-        # Salvăm pentru feedback final (Exam Mode)
         self.user_answers.append({
             "question": q.get("question", ""),
             "user_answer": user_text,
@@ -101,23 +60,13 @@ class QuizManagerModern:
 
         return is_correct, correct_text, explanation
 
-    # ------------------ avans ------------------
-
+    # ----------------- PROGRES -----------------
     def advance(self):
-        """
-        Treci la următoarea întrebare.
-        Returnează True dacă mai sunt întrebări după avans, altfel False.
-        """
         self.current_index += 1
         return self.current_index < len(self.questions)
 
-    # ------------------ raport pentru statistici ------------------
-
+    # ----------------- STATISTICI -----------------
     def get_result_data(self, mode, time_used):
-        """
-        Returnează un dict cu toate datele despre sesiune,
-        pentru salvare în stats.json / leaderboard / PDF.
-        """
         total = len(self.questions)
         percent = round((self.score / total) * 100, 2) if total > 0 else 0.0
         correct = self.score
@@ -132,4 +81,5 @@ class QuizManagerModern:
             "time_used": time_used,
             "correct": correct,
             "incorrect": incorrect,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
         }
