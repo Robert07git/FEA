@@ -1,59 +1,79 @@
 import os
-import statistics
+from statistics import mean
 
-def load_scores():
-    """Încărcă scorurile salvate în score_history.txt."""
-    path = os.path.join(os.path.dirname(__file__), "score_history.txt")
-    if not os.path.exists(path):
-        return []
-
-    data = []
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            parts = line.strip().split(",")
-            if len(parts) == 4:
-                domain, mode, total, pct = parts
-                data.append({
-                    "domain": domain,
-                    "mode": mode,
-                    "total": int(total),
-                    "score": float(pct)
-                })
-    return data
-
-
-def compute_statistics():
-    """Returnează un dicționar cu statistici generale."""
-    scores = load_scores()
-    if not scores:
+def parse_history_line(line):
+    try:
+        parts = [p.strip() for p in line.strip().split("|")]
+        timestamp = parts[0]
+        domeniu = parts[1].split("=")[1]
+        mode = parts[2].split("=")[1]
+        correct, total = map(int, parts[3].split("=")[1].split("/"))
+        procent = float(parts[4].split("=")[1].replace("%", ""))
+        timp_total = float(parts[5].split("=")[1].replace("s", ""))
+        timp_intrebare = parts[6].split("=")[1].replace("s", "").strip()
+        timp_intrebare = float(timp_intrebare) if timp_intrebare not in ["-", ""] else None
+        return {
+            "timestamp": timestamp,
+            "domeniu": domeniu,
+            "mode": mode,
+            "correct": correct,
+            "total": total,
+            "procent": procent,
+            "timp_total_sec": timp_total,
+            "timp_intrebare_sec": timp_intrebare
+        }
+    except Exception:
         return None
 
-    values = [s["score"] for s in scores]
+def load_history():
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(base_dir, "score_history.txt")
+    if not os.path.exists(path):
+        return []
+    entries = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            parsed = parse_history_line(line)
+            if parsed:
+                entries.append(parsed)
+    return entries
+
+def summarize_by_domain(entries):
     domains = {}
-    for s in scores:
-        domains.setdefault(s["domain"], []).append(s["score"])
+    for e in entries:
+        d = e["domeniu"]
+        if d not in domains:
+            domains[d] = []
+        domains[d].append(e["procent"])
 
-    return {
-        "total_sessions": len(values),
-        "average": round(statistics.mean(values), 2),
-        "best": round(max(values), 2),
-        "worst": round(min(values), 2),
-        "per_domain": {k: round(statistics.mean(v), 2) for k, v in domains.items()}
-    }
+    summary = {}
+    for d, vals in domains.items():
+        summary[d] = {
+            "num_sessions": len(vals),
+            "avg_pct": mean(vals),
+            "best_pct": max(vals),
+            "worst_pct": min(vals)
+        }
+    return summary
 
+def best_and_worst_domain(stats):
+    if not stats:
+        return None, None
+    items = sorted(stats.items(), key=lambda x: x[1]["avg_pct"], reverse=True)
+    return items[0], items[-1]
 
 def format_statistics():
-    """Returnează un text formatat pentru afișare."""
-    stats = compute_statistics()
-    if not stats:
-        return "Nu există date statistice."
+    entries = load_history()
+    if not entries:
+        return "Nu există sesiuni înregistrate încă."
 
-    txt = f"📊 Statistici generale\n"
-    txt += f"Sesiuni totale: {stats['total_sessions']}\n"
-    txt += f"Scor mediu general: {stats['average']}%\n"
-    txt += f"Cel mai bun scor: {stats['best']}%\n"
-    txt += f"Cel mai slab scor: {stats['worst']}%\n\n"
-    txt += "Scor mediu pe domeniu:\n"
-    for dom, avg in stats["per_domain"].items():
-        txt += f" • {dom}: {avg}%\n"
-    return txt
+    all_pcts = [e["procent"] for e in entries]
+    avg_all = mean(all_pcts)
+    domain_stats = summarize_by_domain(entries)
+    best, worst = best_and_worst_domain(domain_stats)
+
+    result = f"Performanță generală: {avg_all:.1f}% ({len(entries)} sesiuni)\n"
+    if best and worst:
+        result += f"Cel mai bun domeniu: {best[0]} ({best[1]['avg_pct']:.1f}%)\n"
+        result += f"Cel mai slab domeniu: {worst[0]} ({worst[1]['avg_pct']:.1f}%)"
+    return result
