@@ -16,15 +16,11 @@ def export_pdf_modern(result, answers=None):
     # Font Unicode (regular + "bold" map-uit manual)
     # -------------------------------------------------
     if os.path.exists(FONT_PATH):
-        # font normal
         pdf.add_font("DejaVuSans", "", FONT_PATH, uni=True)
-        # "bold" - folosim același fișier, doar sub alt nume
         pdf.add_font("DejaVuSansBold", "", FONT_PATH, uni=True)
-
         base_font = "DejaVuSans"
         bold_font = "DejaVuSansBold"
     else:
-        # fallback pe Arial dacă nu e găsit fontul
         base_font = "Arial"
         bold_font = "Arial"
 
