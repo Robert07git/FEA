@@ -1,49 +1,40 @@
 # quiz_engine_modern.py
 """
-Logică simplificată pentru noul UI modern (CustomTkinter).
-Nu afectează versiunea veche a aplicației.
+Logică modernă pentru FEA Quiz Trainer — compatibilă cu structura fea_questions.json.
 """
 
 import random
 
-
 class QuizManagerModern:
-    """Gestionează quizul: întrebări, scor, progres."""
+    """Gestionează logica quizului (întrebări, scor, progres)."""
 
     def __init__(self, questions):
-        # questions = listă dicturi de forma:
-        # {
-        #   "question": "...",
-        #   "options": ["a", "b", "c", "d"],
-        #   "answer_index": 1,
-        #   "explanation": "de ce",
-        #   ...
-        # }
-
-        # amestecăm ordinea întrebărilor ca să nu fie mereu la fel
+        # amestecăm întrebările pentru diversitate
         self.questions = random.sample(questions, len(questions))
-        self.score = 0
         self.current_index = 0
+        self.score = 0
 
     def total_questions(self):
+        """Returnează numărul total de întrebări."""
         return len(self.questions)
 
     def get_current_question(self):
-        """Returnează întrebarea curentă ca dict, sau None dacă nu mai sunt."""
+        """Returnează întrebarea curentă (dict complet) sau None dacă s-a terminat."""
         if self.current_index < len(self.questions):
             return self.questions[self.current_index]
         return None
 
     def check_answer(self, selected_index):
-        """
-        Verifică dacă răspunsul ales e corect.
-        Returnează (is_correct, correct_text, explanation)
-        """
+        """Verifică dacă răspunsul ales este corect."""
         q = self.questions[self.current_index]
-        is_correct = (selected_index == q["answer_index"])
-        correct_text = q["options"][q["answer_index"]]
 
+        # accesează cheile specifice structurii tale JSON
+        options = q.get("choices", [])
+        correct_index = q.get("correct_index", 0)
         explanation = q.get("explanation", "")
+
+        is_correct = (selected_index == correct_index)
+        correct_text = options[correct_index] if 0 <= correct_index < len(options) else "—"
 
         if is_correct:
             self.score += 1
@@ -51,10 +42,6 @@ class QuizManagerModern:
         return is_correct, correct_text, explanation
 
     def advance(self):
-        """
-        Merge la următoarea întrebare.
-        Returnează True dacă mai sunt întrebări după asta,
-        False dacă am ajuns la final.
-        """
+        """Trece la următoarea întrebare. Returnează False dacă s-a terminat."""
         self.current_index += 1
         return self.current_index < len(self.questions)
