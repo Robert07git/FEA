@@ -1,0 +1,25 @@
+{
+  "title": "Analiza structurală FEA – bazele",
+  "sections": [
+    {
+      "subtitle": "Ce este o analiză structurală?",
+      "content": "Analiza structurală estimează răspunsul piesei la sarcini mecanice (forțe, presiuni, accelerații, gravitație etc.). Scopul este să aflăm deplasări, tensiuni, siguranță la cedare."
+    },
+    {
+      "subtitle": "Tipuri de elemente finite",
+      "content": "1D (bară/beam): folosit pentru lonjeroane, cadre, grinzi. 2D (shell): folosit pentru tablă subțire, caroserii, componente cu grosime mică. 3D (solid/brick/tetra): folosit pentru zone groase, blocuri, structuri complexe unde starea de tensiune e volumică."
+    },
+    {
+      "subtitle": "Condiții de frontieră",
+      "content": "Fixările trebuie să reprezinte realitatea. O fixare \"totul blocat\" duce la tensiuni artificiale. În practică se blochează DOF-urile pe direcția în care piesa e efectiv constrânsă în utilizare."
+    },
+    {
+      "subtitle": "Nonlinearitate",
+      "content": "Analiză neliniară apare în cazuri cu plastificare material, contact, mari deformații. Solverul folosește incrementare și iterații Newton-Raphson pentru a găsi echilibrul pas cu pas."
+    },
+    {
+      "subtitle": "Calitatea mesh-ului",
+      "content": "Elementele foarte distorsionate → rezultate proaste. Mesh prea mare → timp lung de calcul. Trebuie un echilibru: suficient de fin în zone critice, mai grosier în rest."
+    }
+  ]
+}
