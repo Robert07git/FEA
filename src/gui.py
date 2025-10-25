@@ -55,87 +55,49 @@ class QuizApp:
             indicatoron=0, width=10, font=("Arial", 11, "bold"),
             bg="#00aaaa", fg="white", selectcolor="#00cccc", activebackground="#00cccc"
         )
-        self.train_btn.pack(side="left", padx=5)
+        self.train_btn.pack(side="left", padx=10)
 
         self.exam_btn = tk.Radiobutton(
             frame_modes, text="EXAM", variable=self.mode_var, value="exam",
             indicatoron=0, width=10, font=("Arial", 11, "bold"),
-            bg="#333", fg="white", selectcolor="#00cccc", activebackground="#00cccc"
+            bg="#aa0000", fg="white", selectcolor="#ff3333", activebackground="#ff3333"
         )
-        self.exam_btn.pack(side="left", padx=5)
+        self.exam_btn.pack(side="left", padx=10)
 
-        # Timp per întrebare (doar pentru exam)
-        tk.Label(self.root, text="Timp per întrebare (secunde):", bg="#111", fg="white", font=("Arial", 12)).pack(pady=(15, 0))
-        self.time_limit_var = tk.IntVar(value=15)
-        tk.Spinbox(self.root, from_=5, to=120, textvariable=self.time_limit_var, width=5).pack(pady=10)
-
-        # Butoane principale
-        button_frame = tk.Frame(self.root, bg="#111")
-        button_frame.pack(pady=20)
-
+        # Buton START
         start_btn = tk.Button(
-            button_frame,
-            text="▶ Start Quiz",
-            bg="#00ffff", fg="black", font=("Arial", 12, "bold"),
-            relief="flat", width=14, command=self.start_quiz
+            self.root, text="Start Quiz", font=("Arial", 14, "bold"),
+            bg="#00ffcc", fg="black", command=self.start_quiz
         )
-        start_btn.grid(row=0, column=0, padx=10, pady=10)
+        start_btn.pack(pady=30)
 
-        chart_btn = tk.Button(
-            button_frame,
-            text="📊 Grafic progres",
-            bg="#00cccc", fg="black", font=("Arial", 12, "bold"),
-            relief="flat", width=14, command=show_progress_chart
-        )
-        chart_btn.grid(row=0, column=1, padx=10, pady=10)
+        # Alte butoane - statistici, PDF etc.
+        extras_frame = tk.Frame(self.root, bg="#111")
+        extras_frame.pack(pady=15)
 
-        pdf_btn = tk.Button(
-            button_frame,
-            text="📄 Generează PDF",
-            bg="#0099ff", fg="white", font=("Arial", 12, "bold"),
-            relief="flat", width=14, command=export_quiz_pdf
-        )
-        pdf_btn.grid(row=1, column=0, padx=10, pady=10)
-
-        stats_btn = tk.Button(
-            button_frame,
-            text="📈 Statistici",
-            bg="#0066cc", fg="white", font=("Arial", 12, "bold"),
-            relief="flat", width=14, command=show_dashboard
-        )
-        stats_btn.grid(row=1, column=1, padx=10, pady=10)
+        tk.Button(extras_frame, text="Statistici 📊", font=("Arial", 11),
+                  bg="#222", fg="white", command=show_dashboard).pack(side="left", padx=5)
+        tk.Button(extras_frame, text="Grafic progres 📈", font=("Arial", 11),
+                  bg="#222", fg="white", command=show_progress_chart).pack(side="left", padx=5)
+        tk.Button(extras_frame, text="Export PDF 📝", font=("Arial", 11),
+                  bg="#222", fg="white", command=export_quiz_pdf).pack(side="left", padx=5)
 
     def start_quiz(self):
         domain = self.domain_var.get()
-        num_questions = self.num_questions_var.get()
         mode = self.mode_var.get()
-        time_limit = self.time_limit_var.get()
+        num_questions = self.num_questions_var.get()
 
         questions = load_questions(domain)
         if not questions:
-            messagebox.showerror("Eroare", f"Nu există întrebări pentru domeniul '{domain}'!")
+            messagebox.showerror("Eroare", f"Nu există întrebări pentru domeniul '{domain}'.")
             return
 
-        if num_questions > len(questions):
-            num_questions = len(questions)
+        session = QuizSession(self.root, questions, num_questions, mode)
+        session.run()
 
-        selected_questions = random.sample(questions, num_questions)
 
-        for widget in self.root.winfo_children():
-            widget.destroy()
-
-        QuizSession(self.root, selected_questions, mode=mode, time_limit=time_limit, on_end=self.quiz_finished)
-
-    def quiz_finished(self, correct, total, results):
-        from datetime import datetime
-        pct = (correct / total) * 100 if total > 0 else 0
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        history_path = os.path.join(base_dir, "score_history.txt")
-
-        with open(history_path, "a", encoding="utf-8") as f:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-            line = f"{timestamp} | domeniu={self.domain_var.get()} | mod={self.mode_var.get()} | scor={correct}/{total} | procent={pct:.1f}% | timp_total=- | timp_intrebare={self.time_limit_var.get()}s\n"
-            f.write(line)
-
-        messagebox.showinfo("Rezultat final", f"Scor final: {correct}/{total} ({pct:.1f}%)\nRezultatul a fost salvat în score_history.txt ✅")
-        self.root.destroy()
+# === SECȚIUNEA DE PORNIRE APLICAȚIE ===
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = QuizApp(root)
+    root.mainloop()
