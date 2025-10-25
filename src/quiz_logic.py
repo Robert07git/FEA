@@ -1,75 +1,116 @@
 import random
 import time
-import pygame  # pentru sunet
-from data_loader import load_questions
+import threading
+import pygame
 
+# Inițializare sunet pentru notificare la 5 secunde
 pygame.mixer.init()
+try:
+    beep_sound = pygame.mixer.Sound("data/beep.wav")
+except:
+    beep_sound = None
 
-def play_tick():
-    """Sunet scurt de avertizare la 5 secunde rămase."""
-    try:
-        pygame.mixer.Sound("tick.wav").play()
-    except:
-        pass
 
-def run_quiz(domain, mode, num_questions, time_limit_sec=None):
-    """
-    Rulează quiz-ul și returnează:
-    scor, număr întrebări, listă cu rezultate (pentru PDF și statistici).
-    """
-    questions = load_questions(domain)
-    if len(questions) == 0:
-        raise ValueError(f"Nu există întrebări pentru domeniul {domain}.")
+class QuizSession:
+    def __init__(self, questions, num_questions=10, mode="train", time_limit_sec=None, update_ui_callback=None):
+        """
+        Clasa principală pentru gestionarea quizului.
 
-    selected = random.sample(questions, min(num_questions, len(questions)))
-    results = []
-    score = 0
+        :param questions: listă de întrebări
+        :param num_questions: câte întrebări se aleg
+        :param mode: "train" sau "exam"
+        :param time_limit_sec: secunde per întrebare (doar pentru exam)
+        :param update_ui_callback: funcție pentru actualizarea interfeței
+        """
+        self.questions = random.sample(questions, min(num_questions, len(questions)))
+        self.mode = mode
+        self.time_limit = time_limit_sec
+        self.current_index = 0
+        self.score = 0
+        self.results = []
+        self.timer_thread = None
+        self.time_left = time_limit_sec
+        self.timer_running = False
+        self.update_ui_callback = update_ui_callback
 
-    for idx, q in enumerate(selected, start=1):
-        print(f"\nÎntrebarea {idx}/{num_questions}: {q['question']}")
-        for i, ch in enumerate(q["choices"], start=1):
-            print(f"  {i}. {ch}")
+    def get_current_question(self):
+        """Returnează întrebarea curentă."""
+        if self.current_index < len(self.questions):
+            return self.questions[self.current_index]
+        return None
 
-        answered = False
-        start_time = time.time()
-        user_choice = None
+    def answer_question(self, choice_index):
+        """Procesează răspunsul utilizatorului."""
+        q = self.get_current_question()
+        if not q:
+            return False, "Nu mai sunt întrebări."
 
-        while not answered:
-            if mode == "exam" and time_limit_sec is not None:
-                elapsed = time.time() - start_time
-                if elapsed >= time_limit_sec:
-                    print("\n⏰ Timpul a expirat!")
-                    break
-                if time_limit_sec - elapsed <= 5:
-                    play_tick()
+        is_correct = choice_index == q["correct_index"]
+        if is_correct:
+            self.score += 1
 
-            ans = input("Răspuns (1-4): ").strip()
-            if ans in ["1", "2", "3", "4"]:
-                user_choice = int(ans) - 1
-                answered = True
-            else:
-                print("Introdu un număr valid (1-4).")
-
-        correct = (user_choice == q["correct_index"])
-        if correct:
-            score += 1
-            print("✅ Corect!")
-        else:
-            print(f"❌ Greșit! Răspuns corect: {q['correct_index']+1}. {q['choices'][q['correct_index']]}")
-        if mode == "train":
-            print(f"Explicație: {q['explanation']}")
-
-        results.append({
-            "idx": idx,
-            "domain": domain,
+        self.results.append({
+            "idx": self.current_index + 1,
             "question": q["question"],
             "choices": q["choices"],
             "correct_index": q["correct_index"],
-            "correct": correct,
-            "explanation": q["explanation"],
+            "user_index": choice_index,
+            "correct": is_correct,
+            "explanation": q.get("explanation", ""),
+            "domain": q.get("domain", "n/a"),
         })
 
-    pct = (score / num_questions) * 100 if num_questions > 0 else 0
-    avg_time = f"{time_limit_sec}s" if time_limit_sec else "-"
+        feedback = ""
+        if self.mode == "train":
+            if is_correct:
+                feedback = "✅ Corect!"
+            else:
+                correct_text = q["choices"][q["correct_index"]]
+                feedback = f"❌ Greșit. Corect: {correct_text}\nExplicație: {q.get('explanation', '')}"
 
-    return score, num_questions, results, pct, avg_time
+        self.current_index += 1
+        return is_correct, feedback
+
+    def has_next(self):
+        """Verifică dacă există o întrebare următoare."""
+        return self.current_index < len(self.questions)
+
+    def start_timer(self):
+        """Pornește timerul pentru întrebare (doar în EXAM)."""
+        if self.mode != "exam" or not self.time_limit:
+            return
+        self.time_left = self.time_limit
+        self.timer_running = True
+
+        def countdown():
+            while self.time_left > 0 and self.timer_running:
+                time.sleep(1)
+                self.time_left -= 1
+
+                # Redă sunet la ultimele 5 secunde
+                if self.time_left == 5 and beep_sound:
+                    beep_sound.play()
+
+                if self.update_ui_callback:
+                    self.update_ui_callback()
+
+            # Timp expirat
+            if self.timer_running and self.time_left <= 0:
+                self.timer_running = False
+                if self.update_ui_callback:
+                    self.update_ui_callback(timeout=True)
+
+        self.timer_thread = threading.Thread(target=countdown, daemon=True)
+        self.timer_thread.start()
+
+    def stop_timer(self):
+        """Oprește timerul (la trecerea la următoarea întrebare)."""
+        self.timer_running = False
+        if self.timer_thread and self.timer_thread.is_alive():
+            self.timer_thread.join(timeout=0.1)
+
+    def get_score_summary(self):
+        """Returnează rezumatul scorului."""
+        total = len(self.questions)
+        pct = (self.score / total) * 100 if total > 0 else 0
+        return self.score, total, pct
