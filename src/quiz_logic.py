@@ -49,18 +49,26 @@ class QuizWindow(tk.Toplevel):
         self.options_frame = tk.Frame(self, bg="#111")
         self.options_frame.pack(pady=10)
 
+        # timer text
         self.timer_label = tk.Label(
             self, text="", font=("Segoe UI", 12, "bold"),
             bg="#111", fg="#00FFFF"
         )
-        self.timer_label.pack(pady=10)
+        self.timer_label.pack(pady=5)
+
+        # bară de progres
+        self.progress_frame = tk.Frame(self, bg="#222", width=400, height=20)
+        self.progress_frame.pack(pady=5)
+        self.progress_frame.pack_propagate(False)
+        self.progress_bar = tk.Frame(self.progress_frame, bg="#00FFFF", width=400, height=20)
+        self.progress_bar.pack(side="left", fill="y")
 
         self.next_button = tk.Button(
             self, text="Următoarea ➜", command=self.next_question,
             bg="#00FFFF", fg="black", font=("Segoe UI", 12, "bold"),
             relief="flat", padx=20, pady=6
         )
-        self.next_button.pack(pady=15)
+        self.next_button.pack(pady=20)
 
     # ------------------------------------------------------------
 
@@ -80,7 +88,8 @@ class QuizWindow(tk.Toplevel):
         for widget in self.options_frame.winfo_children():
             widget.destroy()
 
-        for i, option in enumerate(q["options"]):
+        # Folosim 'choices' conform JSON-ului tău
+        for i, option in enumerate(q["choices"]):
             tk.Radiobutton(
                 self.options_frame,
                 text=option,
@@ -103,6 +112,9 @@ class QuizWindow(tk.Toplevel):
             self.timer_thread = threading.Thread(target=self.countdown)
             self.timer_thread.daemon = True
             self.timer_thread.start()
+        else:
+            self.timer_label.config(text="")
+            self.progress_bar.config(width=0)
 
     # ------------------------------------------------------------
 
@@ -110,10 +122,16 @@ class QuizWindow(tk.Toplevel):
         while self.running and self.time_left > 0:
             mins, secs = divmod(self.time_left, 60)
             self.timer_label.config(text=f"Timp rămas: {mins:02d}:{secs:02d}")
+
+            # Bara de progres se micșorează proporțional cu timpul
+            bar_width = int((self.time_left / self.time_limit) * 400)
+            self.progress_bar.config(width=bar_width)
+
             time.sleep(1)
             self.time_left -= 1
 
-            if self.time_left == 5:  # Avertizare audio
+            # avertizare audio la 5 secunde
+            if self.time_left == 5:
                 sound_path = os.path.join(os.path.dirname(__file__), "alert.mp3")
                 if os.path.exists(sound_path):
                     try:
@@ -123,6 +141,7 @@ class QuizWindow(tk.Toplevel):
 
         if self.running and self.time_left <= 0:
             self.timer_label.config(text="Timp expirat!")
+            self.progress_bar.config(width=0)
             self.after(1000, self.next_question)
 
     # ------------------------------------------------------------
@@ -130,21 +149,21 @@ class QuizWindow(tk.Toplevel):
     def next_question(self):
         if not self.running:
             return
-        self.running = False  # Oprire timer curent
+        self.running = False  # oprim timerul curent
 
         q = self.questions[self.current]
         ans = self.selected_answer.get()
 
-        correct = q["correct"]
+        correct_answer = q["choices"][q["correct_index"]]
         explanation = q.get("explanation", "")
 
-        if ans == correct:
+        if ans == correct_answer:
             self.score += 1
             if self.mode == "TRAIN":
                 messagebox.showinfo("Corect ✅", "Răspuns corect!\n\n" + explanation)
         else:
             if self.mode == "TRAIN":
-                messagebox.showerror("Greșit ❌", f"Răspuns greșit!\nCorect era: {correct}\n\n{explanation}")
+                messagebox.showerror("Greșit ❌", f"Răspuns greșit!\nCorect era: {correct_answer}\n\n{explanation}")
 
         self.current += 1
         self.show_question()
