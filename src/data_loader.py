@@ -1,37 +1,31 @@
 import json
 import os
+import random
 
-def load_questions(json_path=None, domain=None):
+def load_questions(domain=None):
     """
-    Încarcă întrebările din fișierul JSON și (opțional) filtrează după domeniu.
-
-    Parametri:
-    - json_path: cale custom către fișierul .json (de obicei nu ai nevoie să setezi)
-    - domain: "structural", "crash", "moldflow", "cfd", "nvh", "mix" sau None
-
-    Returnează:
-    - listă de dict-uri cu întrebări
+    Încarcă întrebările din fișierul data/fea_questions.json.
+    Poți filtra după domeniu (structural, crash, moldflow, CFD, NVH).
     """
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_path = os.path.join(base_dir, "data", "fea_questions.json")
 
-    # dacă nu primim cale, construim automat data/fea_questions.json
-    if json_path is None:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        json_path = os.path.join(base_dir, "data", "fea_questions.json")
+    if not os.path.exists(data_path):
+        raise FileNotFoundError(f"Fișierul nu există: {data_path}")
 
-    # citim toate întrebările din fișier
-    with open(json_path, "r", encoding="utf-8") as f:
-        questions = json.load(f)
+    with open(data_path, "r", encoding="utf-8") as f:
+        all_questions = json.load(f)
 
-    # dacă nu vrem filtrare sau vrem "mix", întoarcem toate
-    if domain is None or domain.lower() == "mix":
-        return questions
+    # Filtrare după domeniu
+    if domain and domain.lower() != "all":
+        filtered = [q for q in all_questions if q.get("domain", "").lower() == domain.lower()]
+        return filtered or all_questions
 
-    # altfel filtrăm întrebările doar pe domeniul ales
-    filtered = [q for q in questions if q.get("domain", "").lower() == domain.lower()]
+    return all_questions
 
-    # dacă nu găsim nimic pe domeniul cerut (greșeală de input),
-    # ca fallback dăm toate întrebările
-    if not filtered:
-        return questions
 
-    return filtered
+def get_random_questions(domain, count):
+    """Returnează un subset random de întrebări."""
+    questions = load_questions(domain)
+    random.shuffle(questions)
+    return questions[:count]
