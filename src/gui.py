@@ -1,59 +1,122 @@
 import tkinter as tk
-from tkinter import ttk
-import os
+from tkinter import ttk, messagebox
+from data_loader import load_questions
+from quiz_logic import QuizWindow
+from progress_chart import generate_progress_chart
+from export_pdf import generate_exam_report
+from stats import show_stats
 
-# Această funcție se integrează cu GUI-ul principal (FEAQuizApp)
-def show_stats():
-    # Verifică dacă există fișierul cu istoricul scorurilor
-    history_file = os.path.join(os.path.dirname(__file__), "score_history.txt")
-    if not os.path.exists(history_file):
-        tk.messagebox.showinfo("Statistici", "Nu există date salvate despre sesiuni anterioare.")
-        return
 
-    # Creează o fereastră separată
-    stats_win = tk.Toplevel()
-    stats_win.title("Statistici generale")
-    stats_win.geometry("600x400")
-    stats_win.configure(bg="#111")
+class FEAQuizApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("FEA Quiz Trainer")
+        self.geometry("800x600")
+        self.configure(bg="#111")
 
-    title = tk.Label(
-        stats_win,
-        text="📊 Rezumat sesiuni anterioare",
-        font=("Segoe UI", 14, "bold"),
-        fg="#00FFFF",
-        bg="#111",
-    )
-    title.pack(pady=10)
+        self.create_widgets()
 
-    # Creează un Treeview pentru a afișa datele
-    tree = ttk.Treeview(stats_win, columns=("Domeniu", "Mod", "Întrebări", "Scor"), show="headings")
-    tree.heading("Domeniu", text="Domeniu")
-    tree.heading("Mod", text="Mod")
-    tree.heading("Întrebări", text="Întrebări totale")
-    tree.heading("Scor", text="Scor (%)")
-    tree.pack(expand=True, fill="both", padx=20, pady=10)
+    def create_widgets(self):
+        title = tk.Label(
+            self,
+            text="Setări sesiune",
+            font=("Segoe UI", 14, "bold"),
+            bg="#111",
+            fg="#00FFFF",
+        )
+        title.pack(pady=10)
 
-    # Încarcă datele din fișier
-    with open(history_file, "r", encoding="utf-8") as f:
-        lines = f.readlines()
+        # Domeniu
+        tk.Label(self, text="Domeniu:", bg="#111", fg="white").pack()
+        self.domain_var = tk.StringVar(value="structural")
+        self.domain_menu = ttk.Combobox(
+            self, textvariable=self.domain_var, values=["structural", "crash", "moldflow", "CFD", "NVH"]
+        )
+        self.domain_menu.pack(pady=5)
 
-    for line in lines:
+        # Număr întrebări
+        tk.Label(self, text="Număr întrebări:", bg="#111", fg="white").pack()
+        self.num_var = tk.IntVar(value=5)
+        tk.Spinbox(self, from_=1, to=50, textvariable=self.num_var, width=5).pack(pady=5)
+
+        # Mod (TRAIN / EXAM)
+        tk.Label(self, text="Mod:", bg="#111", fg="white").pack()
+        self.mode_var = tk.StringVar(value="TRAIN")
+        tk.Radiobutton(self, text="TRAIN (feedback imediat)", variable=self.mode_var, value="TRAIN", bg="#111", fg="white").pack()
+        tk.Radiobutton(self, text="EXAM (limită timp, feedback final)", variable=self.mode_var, value="EXAM", bg="#111", fg="white").pack()
+
+        # Timp per întrebare (doar pentru EXAM)
+        tk.Label(self, text="Timp per întrebare (secunde, doar EXAM):", bg="#111", fg="white").pack(pady=3)
+        self.time_var = tk.IntVar(value=15)
+        tk.Spinbox(self, from_=5, to=120, textvariable=self.time_var, width=5).pack(pady=3)
+
+        # Buton Start
+        start_btn = tk.Button(
+            self,
+            text="▶ Start Quiz",
+            command=self.start_quiz,
+            bg="#00FFFF",
+            fg="black",
+            font=("Segoe UI", 11, "bold"),
+            relief="flat",
+            padx=10,
+            pady=5,
+        )
+        start_btn.pack(pady=10)
+
+        ttk.Separator(self, orient="horizontal").pack(fill="x", pady=10)
+
+        # Secțiunea Rapoarte & Analiză
+        report_lbl = tk.Label(
+            self,
+            text="Rapoarte & Analiză",
+            font=("Segoe UI", 12, "bold"),
+            bg="#111",
+            fg="#00FFFF",
+        )
+        report_lbl.pack(pady=10)
+
+        tk.Button(self, text="📈 Grafic progres", command=self.show_progress, width=20).pack(pady=3)
+        tk.Button(self, text="🧾 Generează PDF", command=self.generate_pdf, width=20).pack(pady=3)
+        tk.Button(self, text="📊 Statistici", command=self.show_stats, width=20).pack(pady=3)
+
+    # === FUNCȚII === #
+
+    def start_quiz(self):
+        domain = self.domain_var.get()
+        num = self.num_var.get()
+        mode = self.mode_var.get()
+        tlim = self.time_var.get()
+
+        # Încarcă întrebările din fișierul JSON
+        questions = load_questions(domain)
+        if not questions:
+            messagebox.showerror("Eroare", f"Nu există întrebări pentru domeniul '{domain}'!")
+            return
+
+        questions = questions[:num]
+        # Deschide fereastra quiz (sincronizată cu QuizWindow din quiz_logic)
+        QuizWindow(self, questions, mode, tlim)
+
+    def show_progress(self):
         try:
-            domain, mode, total, score = line.strip().split(",")
-            tree.insert("", "end", values=(domain, mode, total, score))
-        except ValueError:
-            continue
+            generate_progress_chart()
+        except Exception as e:
+            messagebox.showinfo("Info", f"Funcția progress_chart lipsește momentan.\n\n{e}")
 
-    # Buton de închidere
-    close_btn = tk.Button(
-        stats_win,
-        text="Închide",
-        command=stats_win.destroy,
-        bg="#00FFFF",
-        fg="black",
-        font=("Segoe UI", 11, "bold"),
-        relief="flat",
-        padx=10,
-        pady=5,
-    )
-    close_btn.pack(pady=10)
+    def generate_pdf(self):
+        try:
+            generate_exam_report()
+        except Exception as e:
+            messagebox.showinfo("Info", f"Funcția export_pdf lipsește momentan.\n\n{e}")
+
+    def show_stats(self):
+        try:
+            show_stats()
+        except Exception as e:
+            messagebox.showinfo("Info", f"Eroare la stats:\n{e}")
+
+
+if __name__ == "__main__":
+    app = FEAQuizApp()
+    app.mainloop()
