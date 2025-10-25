@@ -1,8 +1,7 @@
 import customtkinter as ctk
-from tkinter import messagebox
-from quiz_engine_modern import QuizManagerModern
 import json
 import os
+from quiz_engine_modern import QuizManagerModern
 
 
 class QuizApp(ctk.CTk):
@@ -14,26 +13,26 @@ class QuizApp(ctk.CTk):
         self.geometry("900x600")
         self.configure(fg_color="#202020")
 
-        # --- Variabile interne ---
+        # --- Variabile ---
         self.quiz_manager = None
+        self.mode = None
 
-        # --- Layout principal (stânga + dreapta) ---
+        # --- Layout principal ---
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        # frame stânga (meniul)
+        # Panou stânga (meniul)
         self.left_frame = ctk.CTkFrame(self, width=220, corner_radius=0, fg_color="#252525")
         self.left_frame.grid(row=0, column=0, sticky="nswe")
 
-        # frame dreapta (conținut dinamic)
+        # Panou dreapta (conținutul dinamic)
         self.right_frame = ctk.CTkFrame(self, fg_color="#202020")
         self.right_frame.grid(row=0, column=1, sticky="nswe")
 
-        # --- Meniu principal ---
         self.create_main_menu()
 
     # ------------------------------------------------------------
-    #                   Meniul principal
+    #                     Meniu principal
     # ------------------------------------------------------------
     def create_main_menu(self):
         title = ctk.CTkLabel(
@@ -80,7 +79,7 @@ class QuizApp(ctk.CTk):
         exit_btn.pack(side="bottom", pady=20)
 
     # ------------------------------------------------------------
-    #                   Încărcare quiz
+    #                     Începerea quizului
     # ------------------------------------------------------------
     def start_quiz(self, mode):
         self.clear_right_frame()
@@ -93,12 +92,12 @@ class QuizApp(ctk.CTk):
         )
         label.pack(pady=30)
 
-        # Încarcă întrebările din fișierul JSON
+        # încarcă întrebările din JSON
         data_path = os.path.join("data", "fea_questions.json")
         with open(data_path, "r", encoding="utf-8") as f:
             questions = json.load(f)
 
-        # inițializează motorul de quiz
+        # inițializează motorul quizului
         self.quiz_manager = QuizManagerModern(questions)
         self.mode = mode
 
@@ -110,7 +109,7 @@ class QuizApp(ctk.CTk):
         self.show_question()
 
     # ------------------------------------------------------------
-    #                   Afișare întrebare
+    #                     Afișarea întrebărilor
     # ------------------------------------------------------------
     def show_question(self):
         q = self.quiz_manager.get_current_question()
@@ -120,10 +119,9 @@ class QuizApp(ctk.CTk):
 
         self.clear_right_frame()
 
-        # obține lista de variante din cheile compatibile
         options = q.get("choices") or q.get("options") or []
 
-        # titlul întrebării
+        # Titlul întrebării
         question_label = ctk.CTkLabel(
             self.right_frame,
             text=q["question"],
@@ -134,7 +132,7 @@ class QuizApp(ctk.CTk):
         )
         question_label.pack(pady=(30, 20))
 
-        # butoanele pentru răspunsuri
+        # Butoanele pentru opțiuni
         for i, option in enumerate(options):
             btn = ctk.CTkButton(
                 self.right_frame,
@@ -149,7 +147,7 @@ class QuizApp(ctk.CTk):
             btn.pack(pady=8)
 
     # ------------------------------------------------------------
-    #                   Verificare răspuns
+    #                     Verificare răspuns
     # ------------------------------------------------------------
     def handle_answer(self, idx):
         correct, correct_text, explanation = self.quiz_manager.check_answer(idx)
@@ -198,7 +196,7 @@ class QuizApp(ctk.CTk):
         next_btn.pack(pady=20)
 
     # ------------------------------------------------------------
-    #                   Următoarea întrebare
+    #                     Următoarea întrebare
     # ------------------------------------------------------------
     def next_question(self):
         if self.quiz_manager.advance():
@@ -207,7 +205,7 @@ class QuizApp(ctk.CTk):
             self.show_results()
 
     # ------------------------------------------------------------
-    #                   Rezultate finale
+    #                     Rezultate finale
     # ------------------------------------------------------------
     def show_results(self):
         self.clear_right_frame()
@@ -236,7 +234,7 @@ class QuizApp(ctk.CTk):
         back_btn.pack(pady=20)
 
     # ------------------------------------------------------------
-    #                   Alte secțiuni (placeholder)
+    #                   Secțiuni placeholder
     # ------------------------------------------------------------
     def show_stats(self):
         self.clear_right_frame()
@@ -252,4 +250,20 @@ class QuizApp(ctk.CTk):
 
     def show_leaderboard(self):
         self.clear_right_frame()
-        ctk.CTkLabel(self.right_frame, text="🏆 Le_
+        ctk.CTkLabel(self.right_frame, text="🏆 Leaderboard — în dezvoltare", font=("Segoe UI", 20, "bold")).pack(pady=40)
+
+    def show_settings(self):
+        self.clear_right_frame()
+        ctk.CTkLabel(self.right_frame, text="⚙️ Setări — în dezvoltare", font=("Segoe UI", 20, "bold")).pack(pady=40)
+
+    # ------------------------------------------------------------
+    #                   Utility
+    # ------------------------------------------------------------
+    def clear_right_frame(self):
+        for widget in self.right_frame.winfo_children():
+            widget.destroy()
+
+
+if __name__ == "__main__":
+    app = QuizApp()
+    app.mainloop()
