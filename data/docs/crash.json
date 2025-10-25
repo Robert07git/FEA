@@ -4,12 +4,12 @@
     {
       "subtitle": "1. Ce este o simulare de crash?",
       "content": "Simularea de crash reproduce un impact (frontal, lateral, rear) și urmărește cum structura absoarbe energia pentru a proteja ocupanții.",
-      "image": "images/crash/crash_front_impact.png"
+      "image": "images/crash/frontal_crash_analysis.png"
     },
     {
       "subtitle": "2. Zone de deformare controlată (crumple zones)",
       "content": "Structura frontală este proiectată să se deformeze progresiv și să absoarbă energie, astfel încât habitaclul să rămână cât mai intact.",
-      "image": "images/crash/crash_intrusion.png"
+      "image": "images/crash/intrusion_measurement.png"
     },
     {
       "subtitle": "3. Intruzie în habitaclu",
@@ -30,27 +30,6 @@
       "subtitle": "6. Contact și auto-contact",
       "content": "În crash solverul urmărește sute/mii de contacte simultan: piese care se lovesc între ele, pliere tablă, coliziuni interne.",
       "image": ""
-    },
-    {
-      "subtitle": "7. Time step explicit",
-      "content": "Simulările crash folosesc de obicei integrare explicită cu pași de timp extrem de mici (ex: nanosecunde) pentru a captura fenomenul foarte rapid.",
-      "image": ""
-    },
-    {
-      "subtitle": "8. Material plastic / failure",
-      "content": "Modelele includ epuizarea materialului, ruperi locale, plierea, flambajul zonelor subțiri. Se pot urmări zonele unde tabla cedează.",
-      "image": ""
-    },
-    {
-      "subtitle": "9. Criterii de acceptanță",
-      "content": "Analizăm dacă intruzia și accelerațiile rămân sub anumite limite impuse de standarde legale sau interne.",
-      "image": ""
-    },
-    {
-      "subtitle": "10. Optimizare",
-      "content": "Inginerii rulează zeci de cazuri crash cu geometrii diferite pentru a reduce masa și costul dar păstrând siguranța.",
-      "image": ""
     }
   ]
 }
-
