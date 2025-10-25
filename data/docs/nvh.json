@@ -3,52 +3,52 @@
   "sections": [
     {
       "subtitle": "1. Ce înseamnă NVH?",
-      "content": "NVH înseamnă zgomot, vibrație și asprime percepută. Scopul e confortul acustic și vibrațional al utilizatorului.",
-      "image": "images/nvh/nvh_mode_shape.png"
+      "content": "NVH înseamnă zgomot, vibrație și asprime percepută. Scopul este îmbunătățirea confortului acustic și vibrațional al utilizatorului.",
+      "image": "images/nvh/mode_shape_visualization.png"
     },
     {
       "subtitle": "2. Moduri proprii (modal analysis)",
-      "content": "O structură are forme proprii de vibrație. Analiza modală îți spune la ce frecvențe începe să vibreze și cum arată forma acelei vibrații.",
-      "image": "images/nvh/nvh_modal_mesh.png"
+      "content": "O structură are forme proprii de vibrație. Analiza modală îți arată la ce frecvențe și cum vibrează structura.",
+      "image": "images/nvh/vibration_frequency_response.png"
     },
     {
       "subtitle": "3. Răspuns la excitație",
-      "content": "Poți excita un punct cu o forță și vezi cât de mult vibrează diferite zone. Zonele cu amplitudă mare pot genera zgomot sau senzații neplăcute.",
+      "content": "Aplici o forță sau o vibrație într-un punct și observi răspunsul în alte zone. Poți vedea amplificări și rezonanțe.",
       "image": ""
     },
     {
       "subtitle": "4. Transfer acustic",
-      "content": "Se poate calcula cum vibrația structurală se transformă în presiune acustică în cabină / în exterior.",
+      "content": "Undele sonore pot trece prin structuri solide și pot fi convertite în presiune acustică în interiorul cabinei.",
       "image": ""
     },
     {
       "subtitle": "5. Damping",
-      "content": "Materialele și tratamentele fonoabsorbante cresc amortizarea vibrațiilor și reduc zgomotul radiat.",
+      "content": "Materialele fonoabsorbante cresc amortizarea vibrațiilor și reduc zgomotul radiat.",
       "image": ""
     },
     {
       "subtitle": "6. Puncte de fixare (mounts)",
-      "content": "Calea prin care motorul sau alte surse introduc vibrații în structură depinde mult de cum sunt fixate.",
+      "content": "Calea prin care motoarele transmit vibrațiile în caroserie depinde de cât de rigid sunt monturile.",
       "image": ""
     },
     {
-      "subtitle": "7. Complaints subiective",
-      "content": "Termeni ca 'bâzâit', 'huruit', 'vibrează bordul' devin obiectivi prin măsurarea frecvenței și amplitudinii vibrației.",
+      "subtitle": "7. Vibrații la ralanti și la sarcină",
+      "content": "Vibrațiile generate de motor la ralanti sau la sarcină pot fi transmise prin șasiu, caroserie sau sistemul de evacuare. Se analizează pentru reducerea disconfortului perceput de utilizator.",
       "image": ""
     },
     {
-      "subtitle": "8. Corelare test-simulare",
-      "content": "Modelele numerice se calibrează în funcție de măsurători reale pe prototip. Scopul: simulare să prezică ce simte clientul.",
+      "subtitle": "8. Zgomot de rulare și suspensie",
+      "content": "Interacțiunea dintre pneuri, drum și sistemul de suspensie generează zgomot și vibrații. Se simulează pentru îmbunătățirea confortului la rulare.",
       "image": ""
     },
     {
-      "subtitle": "9. Tuning",
-      "content": "Mici modificări la rigiditate, masă, poziție suporturi pot schimba drastic o frecvență proprie și pot elimina zgomote.",
+      "subtitle": "9. Analiza în frecvență (FRF – Frequency Response Function)",
+      "content": "Funcțiile de răspuns în frecvență arată cum reacționează structura la diferite excitații. Se folosesc pentru calibrarea modelelor numerice.",
       "image": ""
     },
     {
-      "subtitle": "10. Rezultatul final",
-      "content": "NVH bun = mașină / produs care pare solid, fără vibrații supărătoare, fără sunete metalice, fără rezonanțe evidente.",
+      "subtitle": "10. Corelarea test-simulare NVH",
+      "content": "Rezultatele din simulare sunt comparate cu măsurători experimentale pentru a valida comportamentul vibrațional și acustic.",
       "image": ""
     }
   ]
