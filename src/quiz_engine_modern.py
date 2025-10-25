@@ -5,6 +5,7 @@ Logică modernă pentru FEA Quiz Trainer — compatibilă cu structura fea_quest
 
 import random
 
+
 class QuizManagerModern:
     """Gestionează logica quizului (întrebări, scor, progres)."""
 
