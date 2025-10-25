@@ -1,63 +1,79 @@
-import os
 from fpdf import FPDF
+import os
 from datetime import datetime
-from stats import load_history, summarize_by_domain, best_and_worst_domain
 
-def export_pdf_report():
-    """Creează un raport PDF cu performanța din score_history.txt."""
+
+class PDFReport(FPDF):
+    def header(self):
+        # Titlu header
+        self.set_font("Arial", "B", 14)
+        self.set_text_color(0, 255, 255)
+        self.cell(0, 10, "FEA Quiz Report", ln=True, align="C")
+        self.set_text_color(0, 0, 0)
+        self.ln(5)
+
+    def footer(self):
+        # Footer cu pagină
+        self.set_y(-15)
+        self.set_font("Arial", "I", 8)
+        self.set_text_color(150, 150, 150)
+        self.cell(0, 10, f"Pagina {self.page_no()}", 0, 0, "C")
+
+
+def generate_pdf_report(domain, mode, score, total, percent, results):
+    """
+    Creează un fișier PDF cu rezultatele quiz-ului.
+    Include detalii despre întrebări greșite și explicații.
+    """
+    pdf = PDFReport()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    pdf.set_font("Arial", "B", 16)
+    pdf.set_text_color(0, 200, 255)
+    pdf.cell(0, 10, "Rezultate sesiune FEA Quiz", ln=True, align="C")
+    pdf.ln(10)
+
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Arial", "", 12)
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    pdf.cell(0, 10, f"Data: {timestamp}", ln=True)
+    pdf.cell(0, 10, f"Domeniu: {domain}", ln=True)
+    pdf.cell(0, 10, f"Mod: {mode}", ln=True)
+    pdf.cell(0, 10, f"Scor final: {score}/{total} ({percent:.1f}%)", ln=True)
+    pdf.ln(10)
+
+    pdf.set_font("Arial", "B", 13)
+    pdf.set_text_color(0, 102, 204)
+    pdf.cell(0, 10, "Întrebări incorecte / Explicații:", ln=True)
+    pdf.ln(5)
+
+    incorrect = [r for r in results if not r["correct"]]
+
+    if not incorrect:
+        pdf.set_text_color(0, 150, 0)
+        pdf.cell(0, 10, "Ai răspuns corect la toate întrebările! Excelent!", ln=True)
+    else:
+        pdf.set_text_color(0, 0, 0)
+        for r in incorrect:
+            q = r["question"]
+            correct = r["choices"][r["correct_index"]]
+            explanation = r.get("explanation", "")
+            pdf.multi_cell(0, 8, f"• {q}", align="L")
+            pdf.set_text_color(255, 0, 0)
+            pdf.cell(0, 8, f"   Răspuns corect: {correct}", ln=True)
+            pdf.set_text_color(50, 50, 50)
+            pdf.multi_cell(0, 8, f"   Explicație: {explanation}", align="L")
+            pdf.ln(5)
+            pdf.set_text_color(0, 0, 0)
+
+    # Salvare fișier
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     reports_dir = os.path.join(base_dir, "reports")
     os.makedirs(reports_dir, exist_ok=True)
 
-    history = load_history()
-    if not history:
-        return "Nu există date de exportat (score_history.txt e gol)."
+    filename = f"FEA_Report_{domain}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    pdf_path = os.path.join(reports_dir, filename)
+    pdf.output(pdf_path)
 
-    # Inițializare PDF
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 18)
-    pdf.cell(200, 10, "FEA Quiz Report", ln=True, align="C")
-    pdf.set_font("Arial", "", 12)
-    pdf.cell(200, 10, f"Generat: {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True, align="C")
-    pdf.ln(10)
-
-    # Statistici generale
-    all_pcts = [e["procent"] for e in history]
-    avg = sum(all_pcts) / len(all_pcts)
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(200, 8, "📊 Statistici generale", ln=True)
-    pdf.set_font("Arial", "", 12)
-    pdf.multi_cell(0, 8, f"Număr sesiuni: {len(history)}")
-    pdf.multi_cell(0, 8, f"Media generală: {avg:.1f}%")
-    pdf.multi_cell(0, 8, f"Cel mai bun scor: {max(all_pcts):.1f}%")
-    pdf.multi_cell(0, 8, f"Cel mai slab scor: {min(all_pcts):.1f}%")
-    pdf.ln(8)
-
-    # Statistici pe domenii
-    domain_stats = summarize_by_domain(history)
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(200, 8, "📘 Statistici pe domenii", ln=True)
-    pdf.set_font("Arial", "", 12)
-    for dom, stats in domain_stats.items():
-        pdf.multi_cell(0, 8,
-            f"{dom.capitalize()}: medie {stats['avg_pct']:.1f}% | best {stats['best_pct']:.1f}% | worst {stats['worst_pct']:.1f}%")
-    pdf.ln(8)
-
-    # Domenii extreme
-    best, worst = best_and_worst_domain(domain_stats)
-    if best and worst:
-        pdf.set_font("Arial", "B", 12)
-        pdf.multi_cell(0, 8,
-            f"Domeniul cel mai puternic: {best[0]} ({best[1]['avg_pct']:.1f}%)")
-        pdf.multi_cell(0, 8,
-            f"Domeniul de îmbunătățit: {worst[0]} ({worst[1]['avg_pct']:.1f}%)")
-
-    pdf.ln(10)
-    pdf.set_font("Arial", "I", 10)
-    pdf.multi_cell(0, 7, "Acest raport a fost generat automat de aplicația FEA Quiz Trainer.\nContinuați antrenamentele pentru a crește progresul!")
-    
-    # Salvare PDF
-    out_path = os.path.join(reports_dir, f"FEA_Quiz_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf")
-    pdf.output(out_path)
-    return out_path
+    return pdf_path
