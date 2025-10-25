@@ -1,4 +1,4 @@
-# ui_modern.py — FEA Quiz Trainer 4.2
+# ui_modern.py — FEA Quiz Trainer 4.2.1
 import customtkinter as ctk
 import json
 import os
@@ -10,7 +10,7 @@ from pdf_exporter_modern import export_pdf_modern
 class QuizApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("FEA Quiz Trainer 4.2 — PDF, Feedback, Mode Colors, Domain Badge")
+        self.title("FEA Quiz Trainer 4.2.1 — PDF, Feedback, Mode Colors, Domain Badge")
         self.geometry("900x600")
         self.configure(fg_color="#202020")
 
@@ -33,7 +33,7 @@ class QuizApp(ctk.CTk):
 
         self.create_main_menu()
 
-    # MENIU PRINCIPAL
+    # ===== MENIU PRINCIPAL =====
     def create_main_menu(self):
         for widget in self.left_frame.winfo_children():
             widget.destroy()
@@ -60,7 +60,7 @@ class QuizApp(ctk.CTk):
                      text="Bine ai venit în FEA Quiz Trainer 👋\nAlege un mod din stânga.",
                      font=("Segoe UI", 18, "bold"), text_color="#ffffff", justify="left").pack(pady=60)
 
-    # CONFIGURARE QUIZ
+    # ===== CONFIGURARE QUIZ =====
     def show_quiz_setup(self, mode):
         setup = ctk.CTkToplevel(self)
         setup.title("Configurare Quiz")
@@ -89,7 +89,7 @@ class QuizApp(ctk.CTk):
 
         ctk.CTkButton(setup, text="Start Quiz", command=confirm, fg_color="#1E5BA6").pack(pady=20)
 
-    # START QUIZ
+    # ===== START QUIZ =====
     def start_quiz(self, mode, domain, num_questions, time_min):
         with open(os.path.join("data", "fea_questions.json"), "r", encoding="utf-8") as f:
             questions = json.load(f)
@@ -113,7 +113,15 @@ class QuizApp(ctk.CTk):
         self.load_quiz()
         self.update_timer()
 
-    # CREARE TIMER
+    # ===== ÎNCĂRCARE QUIZ =====
+    def load_quiz(self):
+        """Inițializează interfața testului: timer, progres și prima întrebare"""
+        self.clear_right_frame()
+        self.create_timer()
+        self.create_progress_bar()
+        self.show_question()
+
+    # ===== TIMER =====
     def create_timer(self):
         header_text = f"{self.color_mode_name} | Timp rămas:"
         self.timer_header_label = ctk.CTkLabel(self.right_frame, text=header_text, font=("Segoe UI", 16, "bold"),
@@ -146,7 +154,7 @@ class QuizApp(ctk.CTk):
         self.time_used += 1
         self.after(1000, self.update_timer)
 
-    # BARA PROGRES
+    # ===== PROGRES =====
     def create_progress_bar(self):
         self.progress_label = ctk.CTkLabel(self.right_frame, text="", font=("Segoe UI", 14))
         self.progress_label.pack(pady=(10, 0))
@@ -166,7 +174,7 @@ class QuizApp(ctk.CTk):
         self.progress_bar.set(pct)
         self.progress_label.configure(text=f"Întrebarea {current}/{total}", text_color=self.color_mode_fg)
 
-    # AFIȘARE ÎNTREBARE + BADGE DOMENIU
+    # ===== AFIȘARE ÎNTREBARE + BADGE =====
     def show_question(self):
         q = self.quiz_manager.get_current_question()
         if not q:
@@ -189,7 +197,7 @@ class QuizApp(ctk.CTk):
                           fg_color="#1E5BA6", hover_color="#297BE6", width=600,
                           command=lambda idx=i: self.handle_answer(idx)).pack(pady=6)
 
-    # RĂSPUNS / FEEDBACK
+    # ===== RĂSPUNS / FEEDBACK =====
     def handle_answer(self, idx):
         correct, correct_text, explanation = self.quiz_manager.check_answer(idx)
         if self.mode == "exam":
@@ -214,7 +222,7 @@ class QuizApp(ctk.CTk):
         else:
             self.show_results()
 
-    # FINAL QUIZ
+    # ===== FINAL QUIZ =====
     def show_results(self):
         self.timer_running = False
         result = self.quiz_manager.get_result_data(self.mode, self.time_used)
@@ -248,7 +256,7 @@ class QuizApp(ctk.CTk):
         ctk.CTkButton(self.right_frame, text="⬅ Înapoi la meniu principal", fg_color="#1E5BA6",
                       command=self.reset_to_menu).pack(pady=20)
 
-    # ALTE FUNCȚII
+    # ===== ALTE FUNCȚII =====
     def manual_export_pdf(self):
         self.clear_right_frame()
         if not self.last_result:
