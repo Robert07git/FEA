@@ -1,129 +1,125 @@
 import tkinter as tk
 from tkinter import messagebox
-import time
-import os
-import random
-from data_loader import get_random_questions
+import random, time, threading
+from playsound import playsound
+from data_loader import load_questions
 
-def run_quiz(domain, num_q, mode, tlim=None):
-    """Rulează un quiz într-o fereastră nouă (TRAIN / EXAM)."""
-    questions = get_random_questions(domain, num_q)
-    if not questions:
-        messagebox.showerror("Eroare", "Nu s-au găsit întrebări pentru acest domeniu.")
-        return
-
-    app = QuizWindow(questions, mode, tlim)
-    app.mainloop()
-
-
-class QuizWindow(tk.Tk):
-    def __init__(self, questions, mode, tlim):
-        super().__init__()
-        self.title("FEA Quiz Session")
-        self.geometry("800x500")
-        self.configure(bg="#111")
-
-        self.questions = questions
+class QuizWindow(tk.Toplevel):
+    def __init__(self, parent, domain, num_questions, mode, time_limit):
+        super().__init__(parent)
+        self.parent = parent
+        self.domain = domain
         self.mode = mode
-        self.tlim = tlim
-        self.index = 0
-        self.correct = 0
-        self.answers = []
+        self.time_limit = time_limit
+        self.questions = load_questions(domain)[:num_questions]
+        self.current_index = 0
+        self.score = 0
+        self.user_answers = []
+        self.remaining_time = time_limit or 0
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        self.remaining = tlim if mode == "exam" else None
-        self.timer_running = False
+        self.configure(bg="#111")
+        self.geometry("920x580")
+        self.title("FEA Quiz Session")
+        self.create_ui()
 
-        self.start_time = time.time()
-
-        self.setup_ui()
-        self.show_question()
-
-        if self.mode == "exam" and self.tlim:
+        if mode == "exam":
             self.start_timer()
 
-    def setup_ui(self):
-        self.lbl_title = tk.Label(self, text="FEA Quiz", font=("Segoe UI", 16, "bold"), bg="#111", fg="#00ffff")
+    # ======================
+    # INTERFAȚĂ
+    # ======================
+    def create_ui(self):
+        self.lbl_title = tk.Label(self, text="FEA Quiz", fg="#00FFFF", bg="#111", font=("Segoe UI", 18, "bold"))
         self.lbl_title.pack(pady=10)
 
-        self.lbl_q = tk.Label(self, text="", wraplength=700, bg="#111", fg="white", font=("Segoe UI", 12))
-        self.lbl_q.pack(pady=20)
+        self.lbl_question = tk.Label(self, text="", fg="white", bg="#111", font=("Segoe UI", 13), wraplength=800)
+        self.lbl_question.pack(pady=15)
 
-        self.var_ans = tk.StringVar()
+        self.frm_options = tk.Frame(self, bg="#111")
+        self.frm_options.pack()
+
+        self.var_selected = tk.IntVar(value=-1)
         self.option_buttons = []
-        for _ in range(4):
-            btn = tk.Radiobutton(self, text="", variable=self.var_ans, value="", font=("Segoe UI", 11),
-                                 fg="white", bg="#111", selectcolor="#222")
-            btn.pack(anchor="w", padx=100)
-            self.option_buttons.append(btn)
 
-        self.lbl_timer = tk.Label(self, text="", fg="#00ffff", bg="#111", font=("Segoe UI", 10))
-        self.lbl_timer.pack(pady=10)
+        self.lbl_timer = tk.Label(self, text="", fg="#00FFFF", bg="#111", font=("Consolas", 13))
+        self.lbl_timer.pack(pady=5)
 
         self.btn_next = tk.Button(self, text="Următoarea ➜", command=self.next_question,
-                                  bg="#00ffff", fg="black", font=("Segoe UI", 10, "bold"))
-        self.btn_next.pack(pady=10)
+                                  bg="#00FFFF", fg="#111", font=("Segoe UI", 11, "bold"))
+        self.btn_next.pack(pady=15)
+
+        self.show_question()
 
     def show_question(self):
-        q = self.questions[self.index]
-        self.lbl_q.config(text=f"Întrebarea {self.index + 1}/{len(self.questions)}:\n\n{q['question']}")
-        opts = q["options"]
-        random.shuffle(opts)
-
-        for i, opt in enumerate(opts):
-            self.option_buttons[i].config(text=opt, value=opt)
-        self.var_ans.set(None)
-
-    def next_question(self):
-        chosen = self.var_ans.get()
-        if not chosen:
-            messagebox.showwarning("Atenție", "Selectează un răspuns înainte de a continua!")
+        if self.current_index >= len(self.questions):
+            self.finish_quiz()
             return
 
-        correct_ans = self.questions[self.index]["answer"]
+        q = self.questions[self.current_index]
+        self.lbl_question.config(text=f"Întrebarea {self.current_index+1}/{len(self.questions)}:\n{q['question']}")
 
-        if chosen == correct_ans:
-            self.correct += 1
-            if self.mode == "train":
-                messagebox.showinfo("Corect ✅", f"{correct_ans} este răspunsul corect!")
-        else:
-            if self.mode == "train":
-                messagebox.showerror("Greșit ❌", f"Răspuns corect: {correct_ans}")
+        for btn in self.option_buttons:
+            btn.destroy()
+        self.option_buttons.clear()
 
-        self.index += 1
+        options = q.get("options", q.get("choices", []))
+        random.shuffle(options)
 
-        if self.index >= len(self.questions):
-            self.finish_quiz()
-        else:
-            self.show_question()
+        for i, opt in enumerate(options):
+            b = tk.Radiobutton(
+                self.frm_options, text=opt, variable=self.var_selected, value=i,
+                font=("Segoe UI", 11), bg="#111", fg="white", selectcolor="#222", activebackground="#222"
+            )
+            b.pack(anchor="w", pady=3)
+            self.option_buttons.append(b)
 
+        self.var_selected.set(-1)
+
+    # ======================
+    # TIMER
+    # ======================
     def start_timer(self):
-        if not self.timer_running:
-            self.timer_running = True
-            self.update_timer()
+        def countdown():
+            while self.remaining_time > 0:
+                mins, secs = divmod(self.remaining_time, 60)
+                self.lbl_timer.config(text=f"Timp rămas: {mins:02}:{secs:02}")
+                if self.remaining_time == 5:
+                    threading.Thread(target=lambda: playsound("alert.mp3", block=False)).start()
+                time.sleep(1)
+                self.remaining_time -= 1
+            if self.remaining_time <= 0:
+                self.next_question()
+        threading.Thread(target=countdown, daemon=True).start()
 
-    def update_timer(self):
-        if self.remaining is not None:
-            self.lbl_timer.config(text=f"Timp rămas: {self.remaining}s")
-            if self.remaining <= 0:
-                self.finish_quiz()
-                return
-            self.remaining -= 1
-            self.after(1000, self.update_timer)
+    # ======================
+    # NAVIGARE
+    # ======================
+    def next_question(self):
+        selected = self.var_selected.get()
+        q = self.questions[self.current_index]
+        correct = q["correct"]
+        is_correct = selected == correct
+
+        self.user_answers.append((q["question"], is_correct))
+        if is_correct:
+            self.score += 1
+
+        self.current_index += 1
+        self.remaining_time = self.time_limit or 0
+        if self.current_index < len(self.questions):
+            self.show_question()
+        else:
+            self.finish_quiz()
 
     def finish_quiz(self):
-        end_time = time.time()
-        duration = end_time - self.start_time
-        avg_time_per_q = duration / len(self.questions)
-
-        score = int((self.correct / len(self.questions)) * 100)
-        msg = f"Scor final: {self.correct}/{len(self.questions)} ({score}%)\n\nTimp total: {duration:.1f}s\nTimp mediu / întrebare: {avg_time_per_q:.1f}s"
-        messagebox.showinfo("Rezultat", msg)
-        self.save_score(score, duration, avg_time_per_q)
+        total = len(self.questions)
+        percent = (self.score / total) * 100
+        messagebox.showinfo("Rezultate", f"Scor: {self.score}/{total} ({percent:.1f}%)")
         self.destroy()
+        self.parent.deiconify()
 
-    def save_score(self, score, duration, avg_time):
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        hist_path = os.path.join(base_dir, "score_history.txt")
-
-        with open(hist_path, "a", encoding="utf-8") as f:
-            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} | domeniu={self.questions[0]['domain']} | mod={self.mode} | scor={self.correct}/{len(self.questions)} | procent={score}% | timp_total={duration:.1f}s | timp_intrebare={avg_time:.1f}s\n")
+    def on_close(self):
+        if messagebox.askokcancel("Confirmare", "Ești sigur că vrei să ieși?"):
+            self.destroy()
+            self.parent.deiconify()
