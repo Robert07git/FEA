@@ -3,32 +3,52 @@
   "sections": [
     {
       "subtitle": "1. Ce este CFD?",
-      "content": "CFD simulează curgerea fluidelor (aer, apă, răcire lichidă) și transferul de căldură. Este folosit pentru aerodinamică, ventilație, răcire componente.",
+      "content": "CFD simulează curgerea fluidelor (aer, apă, răcire lichidă) și transferul de căldură. Este folosit pentru aerodinamică, ventilație și răcire componente.",
       "image": "images/cfd/airflow_visualization.png"
     },
     {
       "subtitle": "2. Domeniul fluid",
-      "content": "În loc să simulezi doar piesa solidă, modelezi și volumul de aer sau lichid din jurul ei. Asta se numește domeniul fluid.",
+      "content": "În loc să simulezi doar piesa solidă, modelezi și volumul de aer sau lichid din jurul ei. Acesta este domeniul fluid.",
       "image": "images/cfd/turbulence_comparison.png"
     },
     {
       "subtitle": "3. Condiții la frontieră",
-      "content": "Definim intrare (inlet: viteză, debit, temperatură), ieșire (outlet: presiune), pereți (no-slip). Fără condiții corecte, rezultatele sunt irelevante.",
+      "content": "Definim intrări (viteze, debit, temperatură), ieșiri (presiune), pereți (no-slip). Fără B.C.-uri corecte, rezultatele sunt irelevante.",
       "image": ""
     },
     {
-      "subtitle": "4. Rețea (mesh CFD)",
-      "content": "Volumul fluid este împărțit în celule (tetra, hexa, poliedrice). Zonele cu gradient mare (colțuri, margini) au mesh mai fin.",
+      "subtitle": "4. Rețea (mesh) CFD",
+      "content": "Volumul fluid este împărțit în celule (tetra, hexa, polyhedrale). Zonele cu gradient mare de viteză au un mesh mai fin.",
       "image": ""
     },
     {
       "subtitle": "5. Regim laminar vs turbulent",
-      "content": "Curgeri lente/ordonate = laminar. Curgeri rapide cu vârtejuri = turbulent. Modelele RANS, LES sau DES aproximează turbulența.",
+      "content": "Curgerea laminară este ordonată. Turbulenta are vârtejuri, amestecuri și pierderi de energie. Modelele RANS/LES simulează turbulența.",
       "image": ""
     },
     {
-      "subtitle": "6. Streamlines (linii de curgere)",
-      "content": "Arată direcția și viteza curgerii fluidului. Permit vizualizarea recirculațiilor, stagnărilor și pierderilor de presiune.",
+      "subtitle": "6. Linii de curgere (streamlines)",
+      "content": "Streamline-urile vizualizează direcția și viteza fluxului. Ele indică recirculații, stagnări și pierderi de presiune.",
+      "image": ""
+    },
+    {
+      "subtitle": "7. Model de turbulență",
+      "content": "Modelele k-epsilon, k-omega sau SST definesc comportamentul turbulent. Alegerea modelului corect influențează acuratețea rezultatelor.",
+      "image": ""
+    },
+    {
+      "subtitle": "8. Transfer termic",
+      "content": "CFD poate calcula și transferul de căldură prin convecție, conducție și radiație. Esențial în analiza de răcire a componentelor.",
+      "image": ""
+    },
+    {
+      "subtitle": "9. Analiza de presiune și forță aerodinamică",
+      "content": "Distribuția presiunii pe o suprafață permite calculul forțelor de ridicare (lift) și rezistență (drag).",
+      "image": ""
+    },
+    {
+      "subtitle": "10. Validare experimentală CFD",
+      "content": "Rezultatele numerice se compară cu măsurători din tunel aerodinamic pentru calibrarea modelelor de turbulență și a mesh-ului.",
       "image": ""
     }
   ]
