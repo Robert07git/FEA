@@ -10,7 +10,7 @@ from pdf_exporter_modern import export_pdf_modern
 class QuizApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("FEA Quiz Trainer 3.8 — PDF, Stats & Leaderboard")
+        self.title("FEA Quiz Trainer 3.9 — PDF, Feedback & Unicode Fix")
         self.geometry("900x600")
         self.configure(fg_color="#202020")
 
@@ -20,9 +20,8 @@ class QuizApp(ctk.CTk):
         self.total_time = 0
         self.time_used = 0
         self.timer_running = False
-        self.last_result = None  # pentru export manual
+        self.last_result = None
 
-        # Layout principal
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
         self.left_frame = ctk.CTkFrame(self, width=220, corner_radius=0, fg_color="#252525")
@@ -46,33 +45,19 @@ class QuizApp(ctk.CTk):
             ("🧾 EXAM MODE", lambda: self.show_quiz_setup("exam")),
             ("📊 STATISTICI", self.show_stats),
             ("🏆 LEADERBOARD", self.show_leaderboard),
-            ("📄 EXPORTĂ PDF DIN NOU", self.manual_export_pdf),  # buton nou
+            ("📄 EXPORTĂ PDF DIN NOU", self.manual_export_pdf),
         ]
 
         for text, cmd in buttons:
-            ctk.CTkButton(
-                self.left_frame,
-                text=text,
-                command=cmd,
-                font=("Segoe UI", 14, "bold"),
-                height=40,
-                width=180,
-                fg_color="#1E5BA6",
-                hover_color="#297BE6",
-            ).pack(pady=8)
+            ctk.CTkButton(self.left_frame, text=text, command=cmd,
+                          font=("Segoe UI", 14, "bold"), height=40, width=180,
+                          fg_color="#1E5BA6", hover_color="#297BE6").pack(pady=8)
 
-        ctk.CTkButton(
-            self.left_frame,
-            text="⬅ Ieșire",
-            command=self.quit,
-            font=("Segoe UI", 14, "bold"),
-            height=40,
-            width=180,
-            fg_color="#A60000",
-            hover_color="#C30000",
-        ).pack(side="bottom", pady=20)
+        ctk.CTkButton(self.left_frame, text="⬅ Ieșire", command=self.quit,
+                      font=("Segoe UI", 14, "bold"), height=40, width=180,
+                      fg_color="#A60000", hover_color="#C30000").pack(side="bottom", pady=20)
 
-    # === Configurare test ===
+    # === Setup Quiz ===
     def show_quiz_setup(self, mode):
         setup = ctk.CTkToplevel(self)
         setup.title("Configurare Quiz")
@@ -95,8 +80,8 @@ class QuizApp(ctk.CTk):
 
         def confirm():
             domain = domain_var.get()
-            num = int(num_var.get()) if num_var.get().isdigit() else None
-            time_min = int(time_var.get()) if time_var.get().isdigit() else 1
+            num = int(num_var.get()) if num_var.get().isdigit() else 10
+            time_min = int(time_var.get()) if time_var.get().isdigit() else 2
             setup.destroy()
             self.start_quiz(mode, domain, num, time_min)
 
@@ -143,7 +128,7 @@ class QuizApp(ctk.CTk):
         self.time_used += 1
         self.after(1000, self.update_timer)
 
-    # === Bara de progres ===
+    # === Progress Bar ===
     def create_progress_bar(self):
         self.progress_label = ctk.CTkLabel(self.right_frame, text="", font=("Segoe UI", 14))
         self.progress_label.pack(pady=(10, 0))
@@ -157,7 +142,7 @@ class QuizApp(ctk.CTk):
         self.progress_bar.set(current / total)
         self.progress_label.configure(text=f"Întrebarea {current}/{total}")
 
-    # === Întrebări ===
+    # === Afișare întrebare ===
     def show_question(self):
         q = self.quiz_manager.get_current_question()
         if not q:
@@ -184,7 +169,11 @@ class QuizApp(ctk.CTk):
         ctk.CTkLabel(self.right_frame, text=result, text_color=color, font=("Segoe UI", 22, "bold")).pack(pady=15)
         ctk.CTkLabel(self.right_frame, text=f"Răspuns corect: {correct_text}", text_color="white").pack(pady=5)
         ctk.CTkLabel(self.right_frame, text=f"Explicație: {explanation}", text_color="#cccccc", wraplength=700).pack(pady=10)
-        ctk.CTkButton(self.right_frame, text="Continuă ➜", command=self.next_question, fg_color="#1E5BA6").pack(pady=15)
+
+        if self.quiz_manager.current_index + 1 < self.quiz_manager.total_questions():
+            ctk.CTkButton(self.right_frame, text="Continuă ➜", command=self.next_question, fg_color="#1E5BA6").pack(pady=15)
+        else:
+            self.show_train_finish(None)
 
     def next_question(self):
         if self.quiz_manager.advance():
@@ -197,21 +186,46 @@ class QuizApp(ctk.CTk):
         self.timer_running = False
         self.clear_right_frame()
         result = self.quiz_manager.get_result_data(self.mode, self.time_used)
-        self.last_result = result  # pentru export manual
+        self.last_result = result
         add_session(result)
-
-        # Export PDF automat
         export_pdf_modern(result, self.quiz_manager.user_answers if self.mode == "train" else None)
 
-        ctk.CTkLabel(self.right_frame, text=f"Rezultat final: {result['percent']}%", font=("Segoe UI", 24, "bold"),
-                     text_color="#00ffff").pack(pady=20)
+        ctk.CTkLabel(self.right_frame, text=f"Rezultat final: {result['percent']}%",
+                     font=("Segoe UI", 24, "bold"), text_color="#00ffff").pack(pady=20)
+        if self.mode == "train":
+            self.show_train_finish(result)
+        else:
+            self.show_exam_summary(result)
+
+    def show_train_finish(self, _):
+        ctk.CTkLabel(self.right_frame, text="🏁 Antrenamentul s-a încheiat!",
+                     text_color="#00ff99", font=("Segoe UI", 20, "bold")).pack(pady=10)
+        ctk.CTkLabel(self.right_frame, text="Toate întrebările au fost parcurse.\nPoți reveni la meniu pentru o nouă sesiune.",
+                     text_color="white", font=("Segoe UI", 14)).pack(pady=10)
+        ctk.CTkButton(self.right_frame, text="⬅ Înapoi la meniu principal",
+                      fg_color="#1E5BA6", command=self.create_main_menu).pack(pady=20)
+
+    def show_exam_summary(self, result):
+        ctk.CTkLabel(self.right_frame, text="Rezumat sesiune exam:",
+                     font=("Segoe UI", 18, "bold"), text_color="#ffffff").pack(pady=10)
+        details = (
+            f"Întrebări totale: {result['total']}\n"
+            f"Răspunsuri corecte: {result['correct']}\n"
+            f"Răspunsuri greșite: {result['incorrect']}\n"
+            f"Scor final: {result['percent']}%\n"
+            f"Timp total: {result['time_used']} secunde"
+        )
+        ctk.CTkLabel(self.right_frame, text=details, justify="left",
+                     font=("Segoe UI", 14), text_color="#cccccc").pack(pady=10)
         ctk.CTkLabel(self.right_frame, text="Raport PDF generat automat ✅",
                      text_color="#00ff99", font=("Segoe UI", 14)).pack(pady=10)
         ctk.CTkButton(self.right_frame, text="📄 Deschide raportul PDF",
                       command=lambda: os.startfile("data/last_session_report.pdf"),
-                      fg_color="#1E5BA6").pack(pady=15)
+                      fg_color="#1E5BA6").pack(pady=10)
+        ctk.CTkButton(self.right_frame, text="⬅ Înapoi la meniu principal",
+                      fg_color="#1E5BA6", command=self.create_main_menu).pack(pady=20)
 
-    # === Export manual PDF ===
+    # === Export PDF manual ===
     def manual_export_pdf(self):
         if not self.last_result:
             self.clear_right_frame()
