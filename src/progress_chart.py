@@ -1,78 +1,33 @@
 import os
 import matplotlib.pyplot as plt
-from statistics import mean
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-HISTORY_PATH = os.path.join(BASE_DIR, "score_history.txt")
-OUTPUT_IMG = os.path.join(BASE_DIR, "progress_chart.png")
+def generate_progress_chart():
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    hist = os.path.join(base_dir, "score_history.txt")
+    out = os.path.join(base_dir, "progress_chart.png")
 
-def parse_history_line(line):
-    try:
-        parts = [p.strip() for p in line.strip().split("|")]
+    if not os.path.exists(hist):
+        raise FileNotFoundError("Nu există score_history.txt – rulează câteva quiz-uri înainte.")
 
-        timestamp = parts[0]
-        domeniu = parts[1].split("=", 1)[1]
-        mode = parts[2].split("=", 1)[1]
-
-        scor_raw = parts[3].split("=", 1)[1]  # "7/10"
-        correct, total = scor_raw.split("/")
-        correct = int(correct)
-        total = int(total)
-
-        pct_raw = parts[4].split("=", 1)[1]  # "70.0%"
-        pct_val = float(pct_raw.replace("%", ""))
-
-        return {
-            "timestamp": timestamp,
-            "domeniu": domeniu,
-            "mode": mode,
-            "correct": correct,
-            "total": total,
-            "pct": pct_val,
-        }
-    except Exception:
-        return None
-
-def load_scores():
-    if not os.path.exists(HISTORY_PATH):
-        return []
-
-    out = []
-    with open(HISTORY_PATH, "r", encoding="utf-8") as f:
+    dates, scores = [], []
+    with open(hist, "r", encoding="utf-8") as f:
         for line in f:
-            if line.strip() == "":
+            try:
+                parts = [p.strip() for p in line.split("|")]
+                date = parts[0]
+                pct = float(parts[4].split("=")[1].replace("%", ""))
+                dates.append(date)
+                scores.append(pct)
+            except:
                 continue
-            entry = parse_history_line(line)
-            if entry:
-                out.append(entry)
-    return out
 
-def main():
-    entries = load_scores()
-    if not entries:
-        print("Nu exista scoruri in score_history.txt inca.")
-        return
-
-    pct_values = [e["pct"] for e in entries]
-    labels_x = list(range(1, len(pct_values) + 1))
-    avg_all = mean(pct_values)
-
-    plt.figure()
-    plt.plot(labels_x, pct_values, marker="o")
-    plt.axhline(avg_all, linestyle="--", label=f"Media totala ({avg_all:.1f}%)")
-
-    plt.xlabel("Sesiunea (#)")
+    plt.figure(figsize=(8, 5))
+    plt.plot(dates, scores, marker="o", linewidth=2)
+    plt.title("Evoluția scorului (%)")
     plt.ylabel("Scor (%)")
-    plt.title("Evolutia scorului in timp (toate domeniile / toate modurile)")
-    plt.legend()
-
+    plt.xticks(rotation=45, ha="right")
+    plt.ylim(0, 100)
+    plt.grid(True, linestyle="--", alpha=0.6)
     plt.tight_layout()
-    plt.savefig(OUTPUT_IMG)
+    plt.savefig(out, dpi=150)
     plt.close()
-
-    print("Grafic generat si salvat ca:")
-    print(OUTPUT_IMG)
-    print("Poti deschide progress_chart.png ca sa vezi trendul tau.")
-
-if __name__ == "__main__":
-    main()
