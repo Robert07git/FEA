@@ -1,181 +1,476 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import json
-import random
 import os
-import time
-from fpdf import FPDF
+import random
 from quiz_logic import QuizWindow
-from stats import show_stats
+from progress_chart import generate_progress_chart
+from export_pdf import generate_exam_report
 
 
-class FEATrainerApp(tk.Tk):
+class FEAGui(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("FEA Quiz Trainer")
-        self.geometry("600x600")
-        self.configure(bg="#111")
 
-        # Titlu principal
-        tk.Label(
-            self, text="Setări sesiune", font=("Segoe UI", 16, "bold"),
-            fg="#00FFFF", bg="#111"
-        ).pack(pady=15)
+        # fereastra principală
+        self.title("FEA Quiz Trainer")
+        self.configure(bg="#111")
+        self.geometry("900x650")
+
+        # stil general (dark)
+        self.style = ttk.Style()
+        self.style.theme_use("clam")
+
+        self.style.configure(
+            "TLabel",
+            background="#111",
+            foreground="white",
+            font=("Segoe UI", 11)
+        )
+        self.style.configure(
+            "Header.TLabel",
+            background="#111",
+            foreground="#00FFFF",
+            font=("Segoe UI", 16, "bold")
+        )
+        self.style.configure(
+            "SectionTitle.TLabel",
+            background="#111",
+            foreground="#00FFFF",
+            font=("Segoe UI", 13, "bold")
+        )
+        self.style.configure(
+            "TButton",
+            font=("Segoe UI", 10, "bold"),
+            background="#00FFFF",
+            foreground="black",
+            padding=6
+        )
+        self.style.map(
+            "TButton",
+            background=[("active", "#00e0e0")]
+        )
+
+        self.style.configure(
+            "Dark.TFrame",
+            background="#111",
+            borderwidth=0,
+            relief="flat"
+        )
+
+        self.style.configure(
+            "Card.TFrame",
+            background="#111",
+            relief="flat",
+            borderwidth=1
+        )
+
+        # variabile UI
+        self.domain_var = tk.StringVar(value="structural")
+        self.num_questions_var = tk.IntVar(value=5)
+        self.mode_var = tk.StringVar(value="TRAIN")  # TRAIN sau EXAM
+        self.time_limit_var = tk.IntVar(value=15)
+
+        # încărcăm toate întrebările din fișierul JSON
+        self.all_questions = self.load_questions()
+
+        # UI
+        self.build_main_ui()
+
+    # -------------------------------------------------
+    # ÎNCĂRCARE ÎNTREBĂRI DIN data/fea_questions.json
+    # -------------------------------------------------
+    def load_questions(self):
+        """
+        Returnează lista cu toate întrebările din data/fea_questions.json.
+        Ridică mesaj de eroare dacă nu e găsit.
+        """
+        # construim path-ul absolut la fea_questions.json
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        #   <proiect>/FEA
+        data_path = os.path.join(base_dir, "data", "fea_questions.json")
+
+        if not os.path.exists(data_path):
+            messagebox.showerror(
+                "Eroare",
+                "Fișierul fea_questions.json nu a fost găsit!\n"
+                "Asigură-te că este în folderul /data lângă /src."
+            )
+            return []
+
+        try:
+            with open(data_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            messagebox.showerror(
+                "Eroare",
+                f"Nu pot citi fea_questions.json:\n{e}"
+            )
+            return []
+
+        # verificare minimă de structură
+        ok = []
+        for q in data:
+            if (
+                "domain" in q and
+                "question" in q and
+                "choices" in q and
+                "correct_index" in q
+            ):
+                ok.append(q)
+        return ok
+
+    # -------------------------------------------------
+    # FUNCȚIE: START QUIZ
+    # -------------------------------------------------
+    def start_quiz(self):
+        """
+        Strânge setările UI, filtrează întrebările pe domeniu,
+        ia un subset random și deschide fereastra de quiz (QuizWindow).
+        """
+        domain = self.domain_var.get().strip()
+        num_q = self.num_questions_var.get()
+        mode = self.mode_var.get().strip()  # TRAIN / EXAM
+        tlim = self.time_limit_var.get() if mode == "EXAM" else None
+
+        # extragem doar întrebările din domeniul selectat
+        domain_questions = [
+            q for q in self.all_questions
+            if q.get("domain", "").lower() == domain.lower()
+        ]
+
+        if len(domain_questions) == 0:
+            messagebox.showerror(
+                "Eroare",
+                f"Nu am găsit întrebări pentru domeniul '{domain}'."
+            )
+            return
+
+        # amestecăm, luăm primele num_q
+        random.shuffle(domain_questions)
+        selected_list = domain_questions[:num_q]
+
+        # creează fereastra quiz
+        try:
+            QuizWindow(
+                self,
+                questions=selected_list,
+                mode=mode,
+                time_limit=tlim
+            )
+        except Exception as e:
+            messagebox.showerror("Eroare", f"Nu am putut porni quiz-ul:\n{e}")
+            return
+
+    # -------------------------------------------------
+    # BUTON: GRAFIC PROGRES
+    # -------------------------------------------------
+    def on_progress_chart(self):
+        """
+        Generează graficul scorurilor în /src/reports/progress_chart.png
+        """
+        try:
+            img_path = generate_progress_chart()
+            messagebox.showinfo(
+                "Succes",
+                f"Graficul progresului a fost salvat în:\n{img_path}"
+            )
+        except Exception as e:
+            messagebox.showerror(
+                "Eroare",
+                f"Nu am putut genera graficul:\n{e}"
+            )
+
+    # -------------------------------------------------
+    # BUTON: GENEREAZĂ PDF
+    # -------------------------------------------------
+    def on_generate_pdf(self):
+        """
+        Creează PDF raport (ultima sesiune din score_history.txt) în /src/reports.
+        """
+        try:
+            pdf_path = generate_exam_report()
+            messagebox.showinfo(
+                "Succes",
+                f"PDF generat în:\n{pdf_path}"
+            )
+        except Exception as e:
+            messagebox.showerror(
+                "Eroare",
+                f"Nu am putut genera PDF-ul:\n{e}"
+            )
+
+    # -------------------------------------------------
+    # BUTON: STATISTICI TEXT (rezumat scor_history.txt)
+    # -------------------------------------------------
+    def on_show_stats(self):
+        """
+        Deschide un mic rezumat statistic într-un messagebox.
+        Citește score_history.txt (domeniu,mod,nr_intrebari,pct)
+        """
+        history_path = os.path.join(
+            os.path.dirname(__file__),
+            "score_history.txt"
+        )
+
+        if not os.path.exists(history_path):
+            messagebox.showinfo(
+                "Statistici",
+                "Nu există încă score_history.txt (joacă niște quiz-uri mai întâi)."
+            )
+            return
+
+        sessions = []
+        try:
+            with open(history_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    # format domeniu,mod,nq,pct
+                    parts = line.split(",")
+                    if len(parts) == 4:
+                        dom, mode, nq, pct = parts
+                        sessions.append((dom, mode, nq, pct))
+        except Exception as e:
+            messagebox.showerror(
+                "Eroare",
+                f"Nu pot citi score_history.txt:\n{e}"
+            )
+            return
+
+        if not sessions:
+            messagebox.showinfo(
+                "Statistici",
+                "score_history.txt e gol sau nu am putut parsa intrările."
+            )
+            return
+
+        # calculăm niște info
+        pct_values = []
+        for (_, _, _, pct) in sessions:
+            try:
+                pct_values.append(float(pct))
+            except:
+                pass
+
+        if pct_values:
+            avg_pct = sum(pct_values) / len(pct_values)
+        else:
+            avg_pct = 0.0
+
+        last_dom, last_mode, last_nq, last_pct = sessions[-1]
+        text = (
+            f"Sesiuni totale: {len(sessions)}\n"
+            f"Ultima sesiune:\n"
+            f"  Domeniu: {last_dom}\n"
+            f"  Mod: {last_mode}\n"
+            f"  Întrebări: {last_nq}\n"
+            f"  Scor: {last_pct}%\n\n"
+            f"Scor mediu total: {avg_pct:.1f}%"
+        )
+
+        messagebox.showinfo("Statistici", text)
+
+    # -------------------------------------------------
+    # UI LAYOUT
+    # -------------------------------------------------
+    def build_main_ui(self):
+        """
+        Construiește panoul principal:
+        - Setări sesiune (domeniu, nr întrebări, mod TRAIN/EXAM, timp)
+        - Secțiunea Rapoarte & Analiză (grafic, pdf, statistici)
+        """
+
+        # ====== top frame mare ======
+        main_frame = ttk.Frame(self, style="Dark.TFrame")
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # ------------------
+        # Titlu mare
+        # ------------------
+        header = ttk.Label(
+            main_frame,
+            text="Setări sesiune",
+            style="Header.TLabel"
+        )
+        header.pack(pady=(0, 15))
+
+        # ------------------
+        # GRID cu setări
+        # ------------------
+        settings_frame = ttk.Frame(main_frame, style="Card.TFrame")
+        settings_frame.pack(pady=5)
 
         # Domeniu
-        tk.Label(self, text="Domeniu:", font=("Segoe UI", 12), bg="#111", fg="white").pack()
-        self.domain_var = tk.StringVar(value="structural")
-        domains = ["structural", "crash", "moldflow", "cfd", "nvh"]
-        ttk.Combobox(self, textvariable=self.domain_var, values=domains, width=20).pack(pady=5)
+        ttk.Label(
+            settings_frame,
+            text="Domeniu:",
+            style="TLabel"
+        ).grid(row=0, column=0, sticky="e", padx=5, pady=5)
 
-        # Număr întrebări
-        tk.Label(self, text="Număr întrebări:", font=("Segoe UI", 12), bg="#111", fg="white").pack()
-        self.num_questions = tk.Spinbox(self, from_=1, to=20, width=5)
-        self.num_questions.pack(pady=5)
-
-        # Mod clar vizibil (butoane personalizate)
-        tk.Label(self, text="Mod:", font=("Segoe UI", 12), bg="#111", fg="white").pack(pady=5)
-        self.mode_var = tk.StringVar(value="TRAIN")
-
-        def set_mode(mode):
-            self.mode_var.set(mode)
-            train_btn.config(bg="#00FFFF" if mode == "TRAIN" else "#222", fg="black" if mode == "TRAIN" else "white")
-            exam_btn.config(bg="#00FFFF" if mode == "EXAM" else "#222", fg="black" if mode == "EXAM" else "white")
-
-        train_btn = tk.Button(
-            self, text="TRAIN (feedback imediat)", command=lambda: set_mode("TRAIN"),
-            bg="#00FFFF", fg="black", font=("Segoe UI", 11, "bold"),
-            relief="flat", width=30, pady=4
+        domain_cb = ttk.Combobox(
+            settings_frame,
+            textvariable=self.domain_var,
+            values=[
+                "structural",
+                "crash",
+                "moldflow",
+                "cfd",
+                "nvh"
+            ],
+            font=("Segoe UI", 10),
+            state="readonly",
+            width=20
         )
-        train_btn.pack(pady=3)
+        domain_cb.grid(row=0, column=1, sticky="w", padx=5, pady=5)
 
-        exam_btn = tk.Button(
-            self, text="EXAM (limită timp, feedback final)", command=lambda: set_mode("EXAM"),
-            bg="#222", fg="white", font=("Segoe UI", 11, "bold"),
-            relief="flat", width=30, pady=4
+        # Numar intrebari
+        ttk.Label(
+            settings_frame,
+            text="Număr întrebări:",
+            style="TLabel"
+        ).grid(row=1, column=0, sticky="e", padx=5, pady=5)
+
+        spin_q = tk.Spinbox(
+            settings_frame,
+            from_=1, to=20,
+            textvariable=self.num_questions_var,
+            font=("Segoe UI", 10),
+            width=5,
+            bg="#222",
+            fg="white",
+            insertbackground="white",
+            highlightbackground="#00FFFF",
+            relief="flat"
         )
-        exam_btn.pack(pady=3)
+        spin_q.grid(row=1, column=1, sticky="w", padx=5, pady=5)
 
-        # Timp per întrebare
-        tk.Label(
-            self, text="Timp per întrebare (secunde, doar EXAM):",
-            font=("Segoe UI", 12), bg="#111", fg="white"
-        ).pack(pady=5)
-        self.time_per_q = tk.Spinbox(self, from_=5, to=120, width=5)
-        self.time_per_q.pack(pady=5)
+        # Mod (TRAIN / EXAM)
+        ttk.Label(
+            settings_frame,
+            text="Mod:",
+            style="TLabel"
+        ).grid(row=2, column=0, sticky="ne", padx=5, pady=5)
 
-        # Buton Start Quiz
-        tk.Button(
-            self, text="▶ Start Quiz", command=self.start_quiz,
-            bg="#00FFFF", fg="black", font=("Segoe UI", 12, "bold"),
-            relief="flat", padx=20, pady=6
-        ).pack(pady=20)
+        mode_frame = ttk.Frame(settings_frame, style="Card.TFrame")
+        mode_frame.grid(row=2, column=1, sticky="w", padx=5, pady=5)
 
-        # Linie separatoare
-        ttk.Separator(self, orient="horizontal").pack(fill="x", pady=15)
+        rb_train = tk.Radiobutton(
+            mode_frame,
+            text="TRAIN (feedback imediat)",
+            variable=self.mode_var,
+            value="TRAIN",
+            bg="#111",
+            fg="white",
+            activebackground="#111",
+            activeforeground="#00FFFF",
+            selectcolor="#111",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        rb_train.pack(anchor="w", pady=2)
 
-        # Secțiunea rapoarte
-        tk.Label(
-            self, text="Rapoarte & Analiză", font=("Segoe UI", 14, "bold"),
-            fg="#00FFFF", bg="#111"
-        ).pack(pady=5)
+        rb_exam = tk.Radiobutton(
+            mode_frame,
+            text="EXAM (limită timp, feedback final)",
+            variable=self.mode_var,
+            value="EXAM",
+            bg="#111",
+            fg="white",
+            activebackground="#111",
+            activeforeground="#00FFFF",
+            selectcolor="#111",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        rb_exam.pack(anchor="w", pady=2)
 
-        tk.Button(
-            self, text="📊 Grafic progres", command=self.show_progress,
-            bg="#00FFFF", fg="black", font=("Segoe UI", 11, "bold"),
-            relief="flat", padx=10, pady=5
-        ).pack(pady=6)
+        # timp per întrebare (EXAM)
+        ttk.Label(
+            settings_frame,
+            text="Timp pe întrebare (secunde, doar EXAM):",
+            style="TLabel"
+        ).grid(row=3, column=0, sticky="e", padx=5, pady=5)
 
-        tk.Button(
-            self, text="🧾 Generează PDF", command=self.generate_pdf,
-            bg="#00FFFF", fg="black", font=("Segoe UI", 11, "bold"),
-            relief="flat", padx=10, pady=5
-        ).pack(pady=6)
+        spin_t = tk.Spinbox(
+            settings_frame,
+            from_=5, to=120,
+            textvariable=self.time_limit_var,
+            font=("Segoe UI", 10),
+            width=5,
+            bg="#222",
+            fg="white",
+            insertbackground="white",
+            highlightbackground="#00FFFF",
+            relief="flat"
+        )
+        spin_t.grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
-        tk.Button(
-            self, text="📈 Statistici", command=self.show_stats,
-            bg="#00FFFF", fg="black", font=("Segoe UI", 11, "bold"),
-            relief="flat", padx=10, pady=5
-        ).pack(pady=6)
+        # buton START QUIZ
+        start_btn = ttk.Button(
+            settings_frame,
+            text="▶ Start Quiz",
+            command=self.start_quiz
+        )
+        start_btn.grid(
+            row=4, column=0,
+            columnspan=2,
+            pady=(15, 5)
+        )
 
-    # ------------------------------------------------------
+        # separatoare vizuale
+        sep = tk.Frame(
+            main_frame,
+            bg="#00FFFF",
+            height=2
+        )
+        sep.pack(fill="x", pady=20)
 
-    def start_quiz(self):
-        domain = self.domain_var.get()
-        mode = self.mode_var.get()
-        num = int(self.num_questions.get())
-        tlim = int(self.time_per_q.get()) if mode == "EXAM" else None
+        # ------------------
+        # Rapoarte & Analiză
+        # ------------------
+        reports_frame = ttk.Frame(main_frame, style="Card.TFrame")
+        reports_frame.pack(pady=5)
 
-        # CAUTĂ FEIȘIERUL ÎN FOLDERUL DATA/
-        base_dir = os.path.dirname(os.path.dirname(__file__))
-        file_path = os.path.join(base_dir, "data", "fea_questions.json")
+        ttk.Label(
+            reports_frame,
+            text="Rapoarte & Analiză",
+            style="SectionTitle.TLabel"
+        ).grid(row=0, column=0, columnspan=2, pady=(0, 10))
 
-        if not os.path.exists(file_path):
-            messagebox.showerror("Eroare", "Fișierul fea_questions.json nu a fost găsit în folderul /data!")
-            return
+        # buton grafic progres
+        btn_chart = ttk.Button(
+            reports_frame,
+            text="📊 Grafic progres",
+            command=self.on_progress_chart
+        )
+        btn_chart.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
 
-        with open(file_path, "r", encoding="utf-8") as f:
-            all_questions = json.load(f)
+        # buton generează PDF
+        btn_pdf = ttk.Button(
+            reports_frame,
+            text="📄 Generează PDF",
+            command=self.on_generate_pdf
+        )
+        btn_pdf.grid(row=1, column=1, sticky="ew", padx=5, pady=5)
 
-        domain_q = [q for q in all_questions if q.get("domain") == domain]
-        if not domain_q:
-            messagebox.showerror("Eroare", f"Nu există întrebări pentru domeniul '{domain}'!")
-            return
+        # buton statistici
+        btn_stats = ttk.Button(
+            reports_frame,
+            text="📈 Statistici",
+            command=self.on_show_stats
+        )
+        btn_stats.grid(row=2, column=0, columnspan=2, sticky="ew", padx=5, pady=5)
 
-        selected = random.sample(domain_q, min(num, len(domain_q)))
-        QuizWindow(self, selected, mode, tlim)
-
-    # ------------------------------------------------------
-
-    def show_progress(self):
-        history_file = os.path.join(os.path.dirname(__file__), "score_history.txt")
-        if not os.path.exists(history_file):
-            messagebox.showinfo("Info", "Nu există încă rezultate salvate.")
-            return
-        os.startfile(history_file)
-
-    # ------------------------------------------------------
-
-    def generate_pdf(self):
-        history_file = os.path.join(os.path.dirname(__file__), "score_history.txt")
-        if not os.path.exists(history_file):
-            messagebox.showinfo("Info", "Nu există rezultate pentru generarea PDF-ului.")
-            return
-
-        reports_dir = os.path.join(os.path.dirname(__file__), "reports")
-        os.makedirs(reports_dir, exist_ok=True)
-
-        pdf_path = os.path.join(reports_dir, f"FEA_Report_{int(time.time())}.pdf")
-
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", "B", 16)
-        pdf.cell(200, 10, txt="FEA Quiz Trainer - Raport Rezultate", ln=True, align="C")
-
-        pdf.set_font("Arial", size=12)
-        pdf.ln(10)
-        with open(history_file, "r", encoding="utf-8") as f:
-            for line in f:
-                parts = line.strip().split(",")
-                if len(parts) == 4:
-                    domain, mode, total, score = parts
-                    pdf.cell(0, 10, txt=f"Domeniu: {domain} | Mod: {mode} | Întrebări: {total} | Scor: {score}%", ln=True)
-
-        try:
-            pdf.output(pdf_path)
-            messagebox.showinfo("Succes", f"PDF generat cu succes!\n\nSalvat în:\n{pdf_path}")
-        except Exception as e:
-            messagebox.showerror("Eroare", f"A apărut o problemă la generarea PDF-ului:\n{e}")
-
-    # ------------------------------------------------------
-
-    def show_stats(self):
-        try:
-            show_stats()
-        except Exception as e:
-            messagebox.showerror("Eroare", f"Nu s-au putut încărca statisticile.\n\n{e}")
+        # make columns expand evenly
+        reports_frame.columnconfigure(0, weight=1)
+        reports_frame.columnconfigure(1, weight=1)
 
 
+# -------------------------------------------------
+# MAIN
+# -------------------------------------------------
 if __name__ == "__main__":
-    app = FEATrainerApp()
+    app = FEAGui()
     app.mainloop()
