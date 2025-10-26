@@ -1,124 +1,84 @@
 import json
 import os
-from datetime import datetime
-
-
-# ==========================================================
-#  📊 StatsManager (original din Moment 0)
-# ==========================================================
 
 class StatsManager:
-    def __init__(self, filepath="data/stats.json"):
-        self.filepath = filepath
-        self.data = self.load_stats()
+    """Gestionarea statisticilor generale."""
 
-    def load_stats(self):
-        """Încarcă statisticile salvate din fișier."""
-        if not os.path.exists(self.filepath):
-            return {"sessions": 0, "scores": []}
-        try:
-            with open(self.filepath, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {"sessions": 0, "scores": []}
+    def __init__(self, stats_path="data/stats.json"):
+        self.stats_path = stats_path
+        self.ensure_file()
 
-    def save_stats(self):
-        """Salvează statisticile în fișier."""
-        try:
-            with open(self.filepath, "w", encoding="utf-8") as f:
-                json.dump(self.data, f, indent=4, ensure_ascii=False)
-        except Exception as e:
-            print(f"[WARN] Eroare la salvarea statisticilor: {e}")
+    # =============================================================
+    # 🧩 INITIALIZARE FIȘIER
+    # =============================================================
+    def ensure_file(self):
+        """Creează fișierul de statistici dacă nu există."""
+        if not os.path.exists(self.stats_path):
+            with open(self.stats_path, "w", encoding="utf-8") as f:
+                json.dump({"sessions": []}, f, indent=4, ensure_ascii=False)
 
-    def add_score(self, score):
-        """Adaugă un nou scor la statistici."""
-        self.data["sessions"] += 1
-        self.data["scores"].append(score)
-        self.save_stats()
+    # =============================================================
+    # 🧾 ADAUGARE SESIUNE
+    # =============================================================
+    def add_score(self, session_data):
+        """Adaugă o sesiune nouă în istoricul de statistici."""
+        with open(self.stats_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
 
-    def get_average(self):
-        """Returnează media scorurilor."""
-        scores = self.data.get("scores", [])
-        if not scores:
-            return 0
-        return sum(scores) / len(scores)
+        data["sessions"].append(session_data)
 
-    def get_best_score(self):
-        """Returnează cel mai mare scor."""
-        scores = self.data.get("scores", [])
-        if not scores:
-            return 0
-        return max(scores)
+        with open(self.stats_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
 
+    # =============================================================
+    # 📊 REZUMAT
+    # =============================================================
+    def get_summary(self):
+        """Returnează un sumar al testelor (număr total și medie scoruri)."""
+        with open(self.stats_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
 
-# ==========================================================
-#  🏆 LeaderboardManager (nou adăugat — FEA Trainer 6.0)
-# ==========================================================
+        sessions = data.get("sessions", [])
+        if not sessions:
+            return {"tests": 0, "avg_score": 0.0}
 
+        avg_score = sum(s["score"] for s in sessions) / len(sessions)
+        return {"tests": len(sessions), "avg_score": round(avg_score, 2)}
+
+# =============================================================
+# 🏆 LEADERBOARD LOCAL (NOU)
+# =============================================================
 class LeaderboardManager:
-    """
-    Gestionează scorurile locale din fișierul leaderboard.json.
-    Păstrează top 10 scoruri (descrescător) și asigură salvarea persistentă.
-    """
+    """Gestionează scorurile locale în leaderboard.json."""
 
-    def __init__(self, filepath="data/leaderboard.json"):
-        self.filepath = filepath
-        self.max_entries = 10
-        self.data = self.load_leaderboard()
+    def __init__(self, file_path="data/leaderboard.json"):
+        self.file_path = file_path
+        self.ensure_file()
 
-    # ----------------------------------------------------------
-    def load_leaderboard(self):
-        """Încarcă leaderboard-ul din fișierul JSON."""
-        if not os.path.exists(self.filepath):
-            return []
-        try:
-            with open(self.filepath, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"[WARN] Eroare la citirea leaderboard-ului: {e}")
-            return []
+    def ensure_file(self):
+        """Creează fișierul leaderboard.json dacă lipsește."""
+        if not os.path.exists(self.file_path):
+            with open(self.file_path, "w", encoding="utf-8") as f:
+                json.dump({"scores": []}, f, indent=4, ensure_ascii=False)
 
-    # ----------------------------------------------------------
-    def save_leaderboard(self):
-        """Salvează leaderboard-ul în fișierul JSON."""
-        try:
-            with open(self.filepath, "w", encoding="utf-8") as f:
-                json.dump(self.data, f, indent=4, ensure_ascii=False)
-        except Exception as e:
-            print(f"[WARN] Eroare la salvarea leaderboard-ului: {e}")
+    def add_score(self, entry):
+        """Adaugă un scor nou și păstrează doar top 10."""
+        with open(self.file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
 
-    # ----------------------------------------------------------
-    def add_score(self, name, mode, domain, score):
-        """
-        Adaugă un scor nou și actualizează leaderboard-ul.
-        name: numele utilizatorului (string)
-        mode: mod quiz ("train" / "exam")
-        domain: domeniul testului (string)
-        score: scor numeric (float)
-        """
-        entry = {
-            "name": name if name else "Anonim",
-            "mode": mode,
-            "domain": domain,
-            "score": round(score, 1),
-            "date": datetime.now().strftime("%Y-%m-%d %H:%M")
-        }
+        data["scores"].append(entry)
+        data["scores"] = sorted(data["scores"], key=lambda x: x["score"], reverse=True)[:10]
 
-        self.data.append(entry)
-        # Sortare descrescătoare după scor
-        self.data = sorted(self.data, key=lambda x: x["score"], reverse=True)
-        # Limităm la top 10
-        self.data = self.data[:self.max_entries]
-        # Salvăm modificările
-        self.save_leaderboard()
+        with open(self.file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
 
-    # ----------------------------------------------------------
     def get_top_scores(self):
-        """Returnează lista celor mai bune scoruri."""
-        return self.data
+        """Returnează lista top 10 scoruri."""
+        with open(self.file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("scores", [])
 
-    # ----------------------------------------------------------
     def clear_leaderboard(self):
-        """Șterge toate scorurile salvate."""
-        self.data = []
-        self.save_leaderboard()
+        """Șterge toate scorurile."""
+        with open(self.file_path, "w", encoding="utf-8") as f:
+            json.dump({"scores": []}, f, indent=4, ensure_ascii=False)
