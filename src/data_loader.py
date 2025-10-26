@@ -20,73 +20,52 @@ def load_questions(domain=None):
     try:
         with open(QUESTIONS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-
-        if domain and domain.lower() != "mix":
-            return [q for q in data if q.get("domain", "").lower() == domain.lower()]
-        else:
-            return data  # toate întrebările pentru modul MIX
+            if domain:
+                return [q for q in data if q.get("domain") == domain]
+            return data
     except Exception as e:
-        print(f"[Eroare la citirea fișierului de întrebări]: {e}")
+        print(f"[Eroare la încărcarea întrebărilor]: {e}")
         return []
 
 
-# ===================== DOMENII DISPONIBILE =====================
-def get_domains():
-    """Returnează lista de domenii disponibile pe baza întrebărilor din fișier."""
-    if not os.path.exists(QUESTIONS_FILE):
-        return []
+# ===================== SALVARE / ÎNCĂRCARE SETĂRI =====================
+SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 
+def load_settings():
+    if not os.path.exists(SETTINGS_FILE):
+        return {}
     try:
-        with open(QUESTIONS_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        domains = sorted(set(q.get("domain", "necunoscut").lower() for q in data))
-        if "mix" not in domains:
-            domains.append("mix")
-        return domains
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
     except Exception as e:
-        print(f"[Eroare la obținerea domeniilor]: {e}")
-        return []
+        print(f"[Eroare la citirea setărilor]: {e}")
+        return {}
 
-
-# ===================== SALVARE REZULTAT =====================
-def save_result(result):
-    """
-    Salvează rezultatul unui test în fișierul JSON.
-    Atributele sunt: mod, domeniu, scor, total, procent, timp_total, timp_intrebare.
-    """
+def save_settings(data):
     os.makedirs(DATA_DIR, exist_ok=True)
-
-    if not os.path.exists(RESULTS_FILE):
-        with open(RESULTS_FILE, "w", encoding="utf-8") as f:
-            json.dump([], f, indent=2, ensure_ascii=False)
-
     try:
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        print(f"[Eroare la salvarea setărilor]: {e}")
+
+
+# ===================== REZULTATE / STATISTICI =====================
+def save_results(result_data):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    results = []
+    if os.path.exists(RESULTS_FILE):
         with open(RESULTS_FILE, "r", encoding="utf-8") as f:
-            results = json.load(f)
-    except json.JSONDecodeError:
-        results = []
+            try:
+                results = json.load(f)
+            except json.JSONDecodeError:
+                results = []
 
-    result_entry = {
-        "data": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "mod": result.get("mod", "necunoscut"),
-        "domeniu": result.get("domeniu", "necunoscut"),
-        "scor": result.get("scor", 0),
-        "total": result.get("total", 0),
-        "procent": round(result.get("procent", 0), 2),
-        "timp_total": result.get("timp_total", "n/a"),
-        "timp_intrebare": result.get("timp_intrebare", "n/a")
-    }
-
-    results.append(result_entry)
-
+    results.append(result_data)
     with open(RESULTS_FILE, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
+        json.dump(results, f, indent=4, ensure_ascii=False)
 
-
-# ===================== CITIRE ISTORIC =====================
 def load_results():
-    """Returnează lista tuturor rezultatelor salvate."""
     if not os.path.exists(RESULTS_FILE):
         return []
     try:
@@ -95,3 +74,26 @@ def load_results():
     except Exception as e:
         print(f"[Eroare la citirea rezultatelor]: {e}")
         return []
+
+
+# ===================== LEADERBOARD LOCAL (Exam only) =====================
+LEADERBOARD_PATH = os.path.join(DATA_DIR, "leaderboard.json")
+
+def load_leaderboard():
+    """Citește scorurile salvate local din data/leaderboard.json."""
+    if not os.path.exists(LEADERBOARD_PATH):
+        return []
+    try:
+        with open(LEADERBOARD_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_leaderboard(data):
+    """Salvează lista de scoruri în data/leaderboard.json."""
+    os.makedirs(os.path.dirname(LEADERBOARD_PATH), exist_ok=True)
+    try:
+        with open(LEADERBOARD_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        print("Eroare la salvarea leaderboard:", e)
