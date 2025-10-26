@@ -1,33 +1,37 @@
+# src/settings_manager.py
 import json
 import os
-from datetime import datetime
 
-STATS_FILE = "data/stats.json"
+class SettingsManager:
+    def __init__(self, filename="data/settings.json"):
+        self.filename = filename
+        self.default_settings = {
+            "username": "",
+            "num_questions": 10,
+            "timer_enabled": True,
+            "dark_mode": True
+        }
+        self.settings = self.load_settings()
 
-def load_stats():
-    if not os.path.exists(STATS_FILE):
-        return {"leaderboard": []}
-    with open(STATS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    def load_settings(self):
+        if not os.path.exists(self.filename):
+            self.save_settings(self.default_settings)
+        try:
+            with open(self.filename, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return self.default_settings
 
-def save_stats(stats):
-    with open(STATS_FILE, "w", encoding="utf-8") as f:
-        json.dump(stats, f, indent=4)
+    def save_settings(self, new_settings=None):
+        if new_settings:
+            self.settings.update(new_settings)
+        os.makedirs(os.path.dirname(self.filename), exist_ok=True)
+        with open(self.filename, "w", encoding="utf-8") as f:
+            json.dump(self.settings, f, indent=4)
 
-def add_score(username, domain, score, total_questions, time_spent):
-    stats = load_stats()
-    new_entry = {
-        "username": username,
-        "domain": domain,
-        "score": round(score, 2),
-        "questions": total_questions,
-        "time": round(time_spent, 1),
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M")
-    }
-    stats["leaderboard"].append(new_entry)
-    stats["leaderboard"] = sorted(stats["leaderboard"], key=lambda x: x["score"], reverse=True)[:10]
-    save_stats(stats)
+    def get(self, key):
+        return self.settings.get(key, self.default_settings.get(key))
 
-def get_leaderboard():
-    stats = load_stats()
-    return stats.get("leaderboard", [])
+    def set(self, key, value):
+        self.settings[key] = value
+        self.save_settings()
