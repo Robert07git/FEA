@@ -378,17 +378,15 @@ class QuizApp(ctk.CTk):
         export_pdf_modern(result)
 
         # ==== Mesaj final ====
-        messagebox.showinfo(
-            "Rezultat final",
-            ("Scor final: {}%
-"
-             "Răspunsuri corecte: {} / {}").format(
-                result['percent'],
-                result['correct'],
-                result['total']
-            )
-        )
-
+       messagebox.showinfo(
+    "Rezultat final",
+    ("Scor final: {}%\n"
+     "Răspunsuri corecte: {} / {}").format(
+        result['percent'],
+        result['correct'],
+        result['total']
+    )
+)
         self.create_main_menu()
     def show_train_finish(self):
         ctk.CTkLabel(
