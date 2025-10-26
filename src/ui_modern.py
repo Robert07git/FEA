@@ -9,7 +9,7 @@ import os
 from tkinter import messagebox
 from tkinter import Frame, Canvas, Scrollbar
 from PIL import Image  # <--- nou
-from quiz_engine_modern import QuizManagerModern
+from quiz_engine_modern import QuizEngine as QuizManagerModern
 from stats_manager import add_session, load_stats, get_summary, get_leaderboard
 from pdf_exporter_modern import export_pdf_modern
 
