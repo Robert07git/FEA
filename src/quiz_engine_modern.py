@@ -1,26 +1,31 @@
-# quiz_engine_modern.py
+# src/quiz_engine_modern.py
 import random
 import datetime
+from src.stats_manager import StatsManager
+from src.settings_manager import SettingsManager
 
 class QuizManagerModern:
     """
     Gestionează:
     - selecția întrebărilor
     - scorul
-    - istoricul răspunsurilor (pt feedback și PDF)
+    - istoricul răspunsurilor
+    - leaderboard (prin StatsManager)
+    - setările utilizatorului
     """
 
     def __init__(self, data, domain="mix", num_questions=10):
-        # filtrează pe domeniu dacă nu e "mix"
+        settings = SettingsManager()
+        num_questions = settings.get("num_questions")
+
         if domain != "mix":
             data = [q for q in data if q.get("domain", "").lower() == domain.lower()]
 
-        # alege random întrebările
         self.questions = random.sample(data, min(num_questions, len(data)))
-
         self.current_index = 0
         self.score = 0
-        self.user_answers = []  # pentru feedback final + PDF
+        self.user_answers = []
+        self.username = settings.get("username")
 
     def get_current_question(self):
         if self.current_index < len(self.questions):
@@ -35,21 +40,7 @@ class QuizManagerModern:
         return self.current_index < len(self.questions)
 
     def check_answer(self, idx):
-        """
-        idx = indexul opțiunii alese de user în lista de choices
-        returnează (is_correct, correct_text, explanation)
-        """
         q = self.questions[self.current_index]
-
-        # structura întrebare:
-        # {
-        #  "domain": "structural",
-        #  "question": "...",
-        #  "choices": ["a","b","c","d"],
-        #  "correct_index": 2,
-        #  "explanation": "..."
-        # }
-
         selected_text = q["choices"][idx]
         correct_text = q["choices"][q["correct_index"]]
         explanation = q.get("explanation", "Nicio explicație disponibilă.")
@@ -58,7 +49,6 @@ class QuizManagerModern:
         if is_correct:
             self.score += 1
 
-        # salvăm pentru feedback final
         self.user_answers.append({
             "question": q["question"],
             "selected": selected_text,
@@ -73,14 +63,21 @@ class QuizManagerModern:
         percent = round((self.score / total) * 100, 1) if total else 0
         domain_used = "mix" if not self.questions else self.questions[0].get("domain", "mix")
 
-        return {
+        # salvează scorul global
+        StatsManager().add_score({
+            "username": self.username or "Anonim",
+            "score": percent,
             "mode": mode,
             "domain": domain_used,
+            "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        })
+
+        return {
+            "mode": mode,
             "score": self.score,
             "total": total,
             "percent": percent,
-            "time_used": time_used,
-            "correct": self.score,
-            "incorrect": total - self.score,
-            "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "domain": domain_used,
+            "answers": self.user_answers,
+            "time_used": time_used
         }
