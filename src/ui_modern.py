@@ -350,7 +350,7 @@ class QuizApp(ctk.CTk):
         else:
             self.show_results()
 
-    # ========== FINAL QUIZ ==========
+        # ============ FINAL QUIZ ============
     def show_results(self):
         self.timer_running = False
 
@@ -363,15 +363,32 @@ class QuizApp(ctk.CTk):
             name = simpledialog.askstring("Leaderboard", "Introdu numele tău pentru clasament:")
             if not name:
                 name = "Anonim"
+
+            from datetime import datetime
+            from data_loader import load_leaderboard, save_leaderboard
+
+            data = load_leaderboard()
             new_entry = {
                 "name": name,
                 "score": round(result['percent'], 1),
                 "mode": "exam",
                 "date": datetime.now().strftime("%Y-%m-%d %H:%M")
             }
-            data = load_leaderboard()
             data.append(new_entry)
             save_leaderboard(data)
+            print(f"[INFO] Scor salvat în Leaderboard: {new_entry}")
+
+        # Mesaj final + PDF export
+        messagebox.showinfo(
+            "Rezultat final",
+            f"Scor final: {result['percent']:.1f}%\n"
+            f"Răspunsuri corecte: {result['correct']} / {result['total']}"
+        )
+
+        self.pdf_exporter.export_result_pdf(result)
+        messagebox.showinfo("PDF", "Fișierul PDF cu rezultatele a fost generat.")
+        self.show_main_menu()
+
 
 
         pdf_path = export_pdf_modern(
