@@ -7,6 +7,7 @@ import customtkinter as ctk
 import json
 import os
 from tkinter import messagebox
+from tkinter import simpledialog
 from tkinter import Frame, Canvas, Scrollbar
 from PIL import Image  # <--- nou
 from quiz_engine_modern import QuizManagerModern
