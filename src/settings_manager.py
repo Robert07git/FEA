@@ -114,3 +114,43 @@ def reset_all_stats():
         os.remove(STATS_FILE)
     if os.path.exists(LEADERBOARD_FILE):
         os.remove(LEADERBOARD_FILE)
+# === Adăugat pentru compatibilitate cu ui_modern ===
+import json
+import os
+
+SETTINGS_FILE = os.path.join("data", "settings.json")
+
+DEFAULT_SETTINGS = {
+    "theme": "dark",
+    "username": "Guest",
+    "sound_enabled": True,
+    "language": "ro",
+    "last_domain": "mix"
+}
+
+def load_settings():
+    """Încarcă setările utilizatorului din fișier JSON."""
+    os.makedirs("data", exist_ok=True)
+    if not os.path.exists(SETTINGS_FILE):
+        save_settings(DEFAULT_SETTINGS)
+        return DEFAULT_SETTINGS
+    try:
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        for k, v in DEFAULT_SETTINGS.items():
+            data.setdefault(k, v)
+        return data
+    except Exception as e:
+        print(f"[EROARE SETTINGS] {e}")
+        return DEFAULT_SETTINGS
+
+
+def save_settings(settings):
+    """Salvează setările utilizatorului într-un fișier JSON."""
+    os.makedirs("data", exist_ok=True)
+    try:
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(settings, f, indent=4, ensure_ascii=False)
+        print("[INFO] Setări salvate cu succes.")
+    except Exception as e:
+        print(f"[EROARE SALVARE SETTINGS] {e}")
