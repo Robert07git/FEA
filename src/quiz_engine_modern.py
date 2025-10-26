@@ -1,100 +1,86 @@
-import json
-import os
+# quiz_engine_modern.py
 import random
-from datetime import datetime
-from stats_manager import LeaderboardManager  # 🏆 nou
+import datetime
 
-class QuizEngine:
-    def __init__(self, data_path="data/questions.json"):
-        self.data_path = data_path
-        self.questions = []
+class QuizManagerModern:
+    """
+    Gestionează:
+    - selecția întrebărilor
+    - scorul
+    - istoricul răspunsurilor (pt feedback și PDF)
+    """
+
+    def __init__(self, data, domain="mix", num_questions=10):
+        # filtrează pe domeniu dacă nu e "mix"
+        if domain != "mix":
+            data = [q for q in data if q.get("domain", "").lower() == domain.lower()]
+
+        # alege random întrebările
+        self.questions = random.sample(data, min(num_questions, len(data)))
+
         self.current_index = 0
         self.score = 0
-        self.mode = "train"
-        self.domain = "General"
-        self.username = "User"
-
-        self.load_questions()
-
-    # =============================================================
-    # 🧩 LOAD QUESTIONS
-    # =============================================================
-    def load_questions(self):
-        """Încarcă întrebările din fișierul JSON."""
-        if not os.path.exists(self.data_path):
-            print(f"[Eroare] Fișierul de întrebări nu există: {self.data_path}")
-            return
-
-        with open(self.data_path, "r", encoding="utf-8") as f:
-            try:
-                data = json.load(f)
-                self.questions = data.get("questions", [])
-            except json.JSONDecodeError:
-                print("[Eroare] Format JSON invalid în fișierul de întrebări.")
-
-    # =============================================================
-    # 🧠 QUIZ LOGIC
-    # =============================================================
-    def start_quiz(self, mode="train", domain="General", username="User"):
-        self.mode = mode
-        self.domain = domain
-        self.username = username
-        self.score = 0
-        self.current_index = 0
-        random.shuffle(self.questions)
+        self.user_answers = []  # pentru feedback final + PDF
 
     def get_current_question(self):
-        """Returnează întrebarea curentă."""
         if self.current_index < len(self.questions):
             return self.questions[self.current_index]
         return None
 
-    def answer_question(self, user_answer):
-        """Verifică răspunsul utilizatorului și actualizează scorul."""
-        question = self.get_current_question()
-        if not question:
-            return False
+    def total_questions(self):
+        return len(self.questions)
 
-        correct = question.get("correct")
-        if user_answer == correct:
-            self.score += 1
-            result = True
-        else:
-            result = False
-
+    def advance(self):
         self.current_index += 1
-        return result
-
-    def has_next_question(self):
-        """Verifică dacă mai sunt întrebări disponibile."""
         return self.current_index < len(self.questions)
 
-    def get_progress(self):
-        """Returnează progresul curent (curent / total)."""
-        total = len(self.questions)
-        return self.current_index, total
+    def check_answer(self, idx):
+        """
+        idx = indexul opțiunii alese de user în lista de choices
+        returnează (is_correct, correct_text, explanation)
+        """
+        q = self.questions[self.current_index]
 
-    # =============================================================
-    # 🏁 RESULTS
-    # =============================================================
-    def get_results(self):
-        """Returnează rezultatele finale."""
+        # structura întrebare:
+        # {
+        #  "domain": "structural",
+        #  "question": "...",
+        #  "choices": ["a","b","c","d"],
+        #  "correct_index": 2,
+        #  "explanation": "..."
+        # }
+
+        selected_text = q["choices"][idx]
+        correct_text = q["choices"][q["correct_index"]]
+        explanation = q.get("explanation", "Nicio explicație disponibilă.")
+        is_correct = (selected_text == correct_text)
+
+        if is_correct:
+            self.score += 1
+
+        # salvăm pentru feedback final
+        self.user_answers.append({
+            "question": q["question"],
+            "selected": selected_text,
+            "correct": correct_text,
+            "explanation": explanation
+        })
+
+        return is_correct, correct_text, explanation
+
+    def get_result_data(self, mode, time_used):
         total = len(self.questions)
-        score_percent = round((self.score / total) * 100, 2) if total > 0 else 0
+        percent = round((self.score / total) * 100, 1) if total else 0
+        domain_used = "mix" if not self.questions else self.questions[0].get("domain", "mix")
+
         return {
-            "name": self.username,
-            "domain": self.domain,
-            "mode": self.mode,
-            "score": score_percent,
-            "date": datetime.now().strftime("%Y-%m-%d %H:%M")
+            "mode": mode,
+            "domain": domain_used,
+            "score": self.score,
+            "total": total,
+            "percent": percent,
+            "time_used": time_used,
+            "correct": self.score,
+            "incorrect": total - self.score,
+            "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
         }
-
-    # =============================================================
-    # 🏆 SAVE TO LEADERBOARD
-    # =============================================================
-    def save_to_leaderboard(self):
-        """Salvează rezultatul final în leaderboard.json."""
-        result = self.get_results()
-        leaderboard = LeaderboardManager()
-        leaderboard.add_score(result)
-        print(f"[INFO] Scorul a fost salvat în leaderboard: {result}")
