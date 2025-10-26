@@ -1,37 +1,29 @@
-# src/settings_manager.py
+# src/stats_manager.py
 import json
 import os
 
-class SettingsManager:
-    def __init__(self, filename="data/settings.json"):
+class StatsManager:
+    def __init__(self, filename="data/stats.json"):
         self.filename = filename
-        self.default_settings = {
-            "username": "",
-            "num_questions": 10,
-            "timer_enabled": True,
-            "dark_mode": True
-        }
-        self.settings = self.load_settings()
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        if not os.path.exists(filename):
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump({"scores": []}, f, indent=4)
 
-    def load_settings(self):
-        if not os.path.exists(self.filename):
-            self.save_settings(self.default_settings)
-        try:
-            with open(self.filename, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return self.default_settings
+    def load(self):
+        with open(self.filename, "r", encoding="utf-8") as f:
+            return json.load(f)
 
-    def save_settings(self, new_settings=None):
-        if new_settings:
-            self.settings.update(new_settings)
-        os.makedirs(os.path.dirname(self.filename), exist_ok=True)
+    def save(self, data):
         with open(self.filename, "w", encoding="utf-8") as f:
-            json.dump(self.settings, f, indent=4)
+            json.dump(data, f, indent=4)
 
-    def get(self, key):
-        return self.settings.get(key, self.default_settings.get(key))
+    def add_score(self, score_entry):
+        data = self.load()
+        data["scores"].append(score_entry)
+        self.save(data)
 
-    def set(self, key, value):
-        self.settings[key] = value
-        self.save_settings()
+    def get_leaderboard(self, limit=10):
+        data = self.load()["scores"]
+        sorted_scores = sorted(data, key=lambda x: x["score"], reverse=True)
+        return sorted_scores[:limit]
