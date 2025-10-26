@@ -349,36 +349,7 @@ class QuizApp(ctk.CTk):
 
     # ========== FINAL QUIZ ==========
 
-    def show_results(self):
-        self.timer_running = False
-
-        # ==== Calcul rezultat și salvare sesiune ====
-        result = self.quiz_manager.get_result_data(self.mode, self.time_used)
-        self.last_result = result
-        add_session(result)
-
-        # ==== Leaderboard local (Exam Mode) ====
-        if self.mode == "exam":
-            name = simpledialog.askstring("Leaderboard", "Introdu numele tău pentru clasament:")
-            if not name:
-                name = "Anonim"
-
-            data = load_leaderboard()
-            new_entry = {
-                "name": name,
-                "score": round(result['percent'], 1),
-                "mode": "exam",
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M")
-            }
-            data.append(new_entry)
-            save_leaderboard(data)
-            print(f"[INFO] Scor salvat în Leaderboard: {new_entry}")
-
-        # ==== Export PDF ====
-        export_pdf_modern(result)
-
-        # ==== Mesaj final ====
-    def show_results(self):
+   def show_results(self):
     self.timer_running = False
 
     # ==== Calcul rezultat și salvare sesiune ====
@@ -409,8 +380,7 @@ class QuizApp(ctk.CTk):
     # ==== Mesaj final ====
     messagebox.showinfo(
         "Rezultat final",
-        ("Scor final: {}%\n"
-         "Răspunsuri corecte: {} / {}").format(
+        "Scor final: {}%\nRăspunsuri corecte: {} / {}".format(
             result['percent'],
             result['correct'],
             result['total']
@@ -419,7 +389,6 @@ class QuizApp(ctk.CTk):
 
     self.create_main_menu()
 
-        self.create_main_menu()
     def show_train_finish(self):
         ctk.CTkLabel(
             self.right_frame,
