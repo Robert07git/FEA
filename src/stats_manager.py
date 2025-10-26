@@ -1,34 +1,42 @@
+# stats_manager.py
 import json
 import os
 from datetime import datetime
 
-STATS_FILE = "data/stats.json"
+STATS_FILE = os.path.join("data", "stats.json")
+
 
 def load_stats():
     if not os.path.exists(STATS_FILE):
-        return {"leaderboard": []}
-    with open(STATS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+        return []
+    try:
+        with open(STATS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        return []
 
-def save_stats(stats):
+
+def save_stats(data):
+    os.makedirs("data", exist_ok=True)
     with open(STATS_FILE, "w", encoding="utf-8") as f:
-        json.dump(stats, f, indent=4)
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
-def add_score(username, domain, score, total_questions, time_spent):
+
+def add_session(result):
     stats = load_stats()
-    new_entry = {
-        "username": username,
-        "domain": domain,
-        "score": round(score, 2),
-        "questions": total_questions,
-        "time": round(time_spent, 1),
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M")
-    }
-    stats["leaderboard"].append(new_entry)
-    # Sortăm descrescător după scor și păstrăm doar primele 10
-    stats["leaderboard"] = sorted(stats["leaderboard"], key=lambda x: x["score"], reverse=True)[:10]
+    result["date"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+    stats.append(result)
     save_stats(stats)
+    print(f"[INFO] Sesiune salvată: {result}")
 
-def get_leaderboard():
-    stats = load_stats()
-    return stats.get("leaderboard", [])
+
+def get_summary(stats):
+    if not stats:
+        return {"total_sessions": 0, "avg_score": 0, "best_score": 0}
+    avg = sum(s["percent"] for s in stats) / len(stats)
+    best = max(s["percent"] for s in stats)
+    return {"total_sessions": len(stats), "avg_score": round(avg, 2), "best_score": best}
+
+
+def get_leaderboard(stats, top_n=5):
+    return sorted(stats, key=lambda s: s.get("percent", 0), reverse=True)[:top_n]
