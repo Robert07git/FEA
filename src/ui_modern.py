@@ -5,16 +5,17 @@
 
 import customtkinter as ctk
 import json
-from datetime import datetime
 import os
 from tkinter import messagebox
 from tkinter import simpledialog
+from datetime import datetime
+from data_loader import load_leaderboard, save_leaderboard
+
 from tkinter import Frame, Canvas, Scrollbar
 from PIL import Image  # <--- nou
 from quiz_engine_modern import QuizManagerModern
 from stats_manager import add_session, load_stats, get_summary, get_leaderboard
 from pdf_exporter_modern import export_pdf_modern
-from data_loader import load_leaderboard, save_leaderboard
 
 
 class QuizApp(ctk.CTk):
@@ -350,46 +351,13 @@ class QuizApp(ctk.CTk):
         else:
             self.show_results()
 
-        # ============ FINAL QUIZ ============
+    # ========== FINAL QUIZ ==========
     def show_results(self):
         self.timer_running = False
 
         result = self.quiz_manager.get_result_data(self.mode, self.time_used)
         self.last_result = result
         add_session(result)
-
-        # === Leaderboard Local (Exam only) ===
-        if self.mode == "exam":
-            name = simpledialog.askstring("Leaderboard", "Introdu numele tău pentru clasament:")
-            if not name:
-                name = "Anonim"
-
-            from datetime import datetime
-            from data_loader import load_leaderboard, save_leaderboard
-
-            data = load_leaderboard()
-            new_entry = {
-                "name": name,
-                "score": round(result['percent'], 1),
-                "mode": "exam",
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M")
-            }
-            data.append(new_entry)
-            save_leaderboard(data)
-            print(f"[INFO] Scor salvat în Leaderboard: {new_entry}")
-
-        # Mesaj final + PDF export
-        messagebox.showinfo(
-            "Rezultat final",
-            f"Scor final: {result['percent']:.1f}%\n"
-            f"Răspunsuri corecte: {result['correct']} / {result['total']}"
-        )
-
-        self.pdf_exporter.export_result_pdf(result)
-        messagebox.showinfo("PDF", "Fișierul PDF cu rezultatele a fost generat.")
-        self.show_main_menu()
-
-
 
         pdf_path = export_pdf_modern(
             result,
@@ -752,31 +720,3 @@ class QuizApp(ctk.CTk):
 if __name__ == "__main__":
     app = QuizApp()
     app.mainloop()
-
-    # ========== Leaderboard Local UI ==========
-    def show_leaderboard_ui(self):
-        self.clear_right_frame()
-        ctk.CTkLabel(self.right_frame, text="🏆 LEADERBOARD LOCAL", font=("Segoe UI", 22, "bold"), text_color="#00ffff").pack(pady=20)
-
-        data = load_leaderboard()
-        if not data:
-            ctk.CTkLabel(self.right_frame, text="Niciun scor salvat încă.", font=("Segoe UI", 16), text_color="#ffffff").pack(pady=10)
-            return
-
-        data = sorted(data, key=lambda x: x.get("score", 0), reverse=True)[:10]
-        for i, entry in enumerate(data, start=1):
-            color = "#FFD700" if i == 1 else "#00ffff" if i == 2 else "#ff9933"
-            ctk.CTkLabel(
-                self.right_frame,
-                text=f"{i}. {entry.get('name', 'Anonim')} - {entry.get('score', 0)}%  ({entry.get('date', '')})",
-                text_color=color,
-                font=("Segoe UI", 16, "bold")
-            ).pack(pady=4)
-
-        ctk.CTkButton(self.right_frame, text="🧹 Șterge tot", fg_color="#A60000", command=self.clear_leaderboard).pack(pady=10)
-        ctk.CTkButton(self.right_frame, text="⬅ Înapoi", fg_color="#1E5BA6", command=self.create_main_menu).pack(pady=10)
-
-    def clear_leaderboard(self):
-        if messagebox.askyesno("Confirmare", "Sigur vrei să ștergi toate scorurile?"):
-            save_leaderboard([])
-            self.show_leaderboard_ui()
