@@ -5,7 +5,7 @@ import os
 from PIL import Image, ImageTk
 from quiz_engine_modern import QuizEngine
 from stats_manager import load_stats
-from pdf_exporter_modern import export_to_pdf
+from pdf_exporter_modern import export_pdf_modern as export_to_pdf
 from settings_manager import load_settings, save_settings
 from data_loader import load_questions, load_learning_materials
 import json
