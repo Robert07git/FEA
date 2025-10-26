@@ -7,10 +7,6 @@ import customtkinter as ctk
 import json
 import os
 from tkinter import messagebox
-from tkinter import simpledialog
-from datetime import datetime
-from data_loader import load_leaderboard, save_leaderboard
-
 from tkinter import Frame, Canvas, Scrollbar
 from PIL import Image  # <--- nou
 from quiz_engine_modern import QuizManagerModern
@@ -352,6 +348,8 @@ class QuizApp(ctk.CTk):
             self.show_results()
 
     # ========== FINAL QUIZ ==========
+
+    # ========== FINAL QUIZ (Moment 2.2) ==========
     def show_results(self):
         self.timer_running = False
 
@@ -359,27 +357,34 @@ class QuizApp(ctk.CTk):
         self.last_result = result
         add_session(result)
 
-        pdf_path = export_pdf_modern(
-            result,
-            self.quiz_manager.user_answers if self.mode == "train" else None
+        # === Leaderboard Local (doar Exam Mode) ===
+        if self.mode == "exam":
+            name = simpledialog.askstring("Leaderboard", "Introdu numele tău pentru clasament:")
+            if not name:
+                name = "Anonim"
+
+            data = load_leaderboard()
+            new_entry = {
+                "name": name,
+                "score": round(result['percent'], 1),
+                "mode": "exam",
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M")
+            }
+            data.append(new_entry)
+            save_leaderboard(data)
+            print(f"[INFO] Scor salvat în Leaderboard: {new_entry}")
+
+        # PDF export
+        export_pdf_modern(result)
+
+        # Mesaj final
+        messagebox.showinfo(
+            "Rezultat final",
+            f"Scor final: {result['percent']}%
+Răspunsuri corecte: {result['correct']} / {result['total']}"
         )
-        if pdf_path:
-            messagebox.showinfo("Raport generat", f"Raportul PDF a fost salvat în:\n{pdf_path}")
 
-        self.clear_right_frame()
-
-        ctk.CTkLabel(
-            self.right_frame,
-            text=f"Rezultat final: {result['percent']}%",
-            font=("Segoe UI", 24, "bold"),
-            text_color="#00ffff"
-        ).pack(pady=20)
-
-        if self.mode == "train":
-            self.show_train_finish()
-        else:
-            self.show_exam_review()
-
+        self.reset_to_menu()
     def show_train_finish(self):
         ctk.CTkLabel(
             self.right_frame,
