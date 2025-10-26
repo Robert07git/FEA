@@ -3,21 +3,22 @@ import os
 import random
 
 # ================================================================
-#  DATA LOADER - Moment 2.1 (versiune completă cu Leaderboard Local)
+#  DATA LOADER - Moment 2.2  (bază Moment 1 + Leaderboard Local)
 # ================================================================
 
-# === 0. DETECTARE AUTOMATĂ A FOLDERULUI DATA ===
+
+# === 0. Detectare automată a folderului data ===
 def get_data_dir():
-    """Determină calea absolută către folderul 'data' indiferent de unde rulezi aplicația."""
+    """Determină calea absolută către folderul 'data' indiferent de locul de rulare."""
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    # Dacă rulezi din src/, mergem un nivel mai sus
     data_dir = os.path.join(base_dir, "..", "data")
     os.makedirs(data_dir, exist_ok=True)
     return data_dir
 
 
-# === 1. ÎNCĂRCARE ÎNTREBĂRI QUIZ ===
+# === 1. Încărcare întrebări ===
 def load_questions():
+    """Încarcă întrebările din fea_questions.json."""
     path = os.path.join(get_data_dir(), "fea_questions.json")
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -35,7 +36,7 @@ def load_questions():
         return []
 
 
-# === 2. SELECTARE ALEATORIE DE ÎNTREBĂRI ===
+# === 2. Selectare aleatorie de întrebări ===
 def get_random_questions(domain="mix", count=10):
     all_questions = load_questions()
     if not all_questions:
@@ -50,7 +51,7 @@ def get_random_questions(domain="mix", count=10):
     return filtered[:count]
 
 
-# === 3. GESTIONARE STATISTICI ===
+# === 3. Gestionare statistici (Moment 1) ===
 def load_stats():
     path = os.path.join(get_data_dir(), "results.json")
     try:
@@ -72,7 +73,7 @@ def add_session(result):
     save_stats(stats)
 
 
-# === 4. LEADERBOARD LOCAL ===
+# === 4. Leaderboard Local (Moment 2.2) ===
 def load_leaderboard():
     """
     Încarcă leaderboard-ul local.
@@ -89,6 +90,7 @@ def load_leaderboard():
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
             if isinstance(data, dict):
+                print("[WARN] Leaderboard invalid, resetat.")
                 data = []
     except json.JSONDecodeError:
         data = []
@@ -107,7 +109,6 @@ def save_leaderboard(data):
     if not isinstance(data, list):
         data = []
 
-    # Debug opțional — vezi unde scrie
     print(f"[DEBUG] Leaderboard salvat în: {os.path.abspath(path)}")
 
     with open(path, "w", encoding="utf-8") as f:
