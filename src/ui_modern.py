@@ -9,7 +9,7 @@ import os
 from tkinter import messagebox
 from tkinter import Frame, Canvas, Scrollbar
 from PIL import Image  # <--- nou
-from quiz_engine_modern import QuizEngine as QuizManagerModern
+from quiz_engine_modern import QuizManagerModern
 from stats_manager import add_session, load_stats, get_summary, get_leaderboard
 from pdf_exporter_modern import export_pdf_modern
 
@@ -716,64 +716,3 @@ class QuizApp(ctk.CTk):
 if __name__ == "__main__":
     app = QuizApp()
     app.mainloop()
-# =============================================================
-    #  🏆 LEADERBOARD LOCAL — NOU (FEA Trainer 6.0)
-    # =============================================================
-    def show_leaderboard(self):
-        """Afișează leaderboard-ul local (Top 10 scoruri salvate)."""
-        self.clear_main_frame()
-
-        tk.Label(self.main_frame, text="🏆 LEADERBOARD LOCAL",
-                 font=("Segoe UI", 20, "bold"),
-                 fg="#00ffff", bg="#1e1e1e").pack(pady=20)
-
-        leaderboard = LeaderboardManager()
-        scores = leaderboard.get_top_scores()
-
-        if not scores:
-            tk.Label(self.main_frame, text="Nu există scoruri salvate momentan.",
-                     font=("Segoe UI", 12),
-                     fg="white", bg="#1e1e1e").pack(pady=30)
-            tk.Button(self.main_frame, text="⬅ Înapoi la meniu",
-                      command=self.clear_main_frame,
-                      bg="#0a57d1", fg="white",
-                      font=("Segoe UI", 10, "bold"),
-                      relief="flat", cursor="hand2").pack(pady=20)
-            return
-
-        # Afișare tabel (Top 10 scoruri)
-        header = f"{'Nr.':<4}{'Nume':<18}{'Domeniu':<15}{'Mod':<10}{'Scor (%)':<10}{'Data':<15}"
-        tk.Label(self.main_frame, text=header,
-                 font=("Consolas", 11, "bold"),
-                 fg="#00ffff", bg="#1e1e1e",
-                 justify="left").pack(anchor="w", padx=40, pady=5)
-
-        colors = ["#FFD700", "#C0C0C0", "#CD7F32"]
-        for i, entry in enumerate(scores, start=1):
-            color = colors[i - 1] if i <= 3 else "#00ffff"
-            row = f"{i:<4}{entry['name']:<18}{entry['domain']:<15}{entry['mode']:<10}{entry['score']:<10}{entry['date']:<15}"
-            tk.Label(self.main_frame, text=row,
-                     font=("Consolas", 10),
-                     fg=color, bg="#1e1e1e",
-                     justify="left").pack(anchor="w", padx=40, pady=2)
-
-        tk.Label(self.main_frame, text="─" * 90,
-                 bg="#1e1e1e", fg="#333").pack(pady=10)
-
-        def clear_lb():
-            confirm = messagebox.askyesno("Confirmare", "Sigur vrei să ștergi toate scorurile din Leaderboard?")
-            if confirm:
-                leaderboard.clear_leaderboard()
-                self.show_leaderboard()
-
-        tk.Button(self.main_frame, text="🗑 Șterge toate scorurile",
-                  command=clear_lb,
-                  bg="#444", fg="white",
-                  font=("Segoe UI", 10, "bold"),
-                  relief="flat", cursor="hand2").pack(pady=10)
-
-        tk.Button(self.main_frame, text="⬅ Înapoi la meniu",
-                  command=self.clear_main_frame,
-                  bg="#0a57d1", fg="white",
-                  font=("Segoe UI", 10, "bold"),
-                  relief="flat", cursor="hand2").pack(pady=20)
