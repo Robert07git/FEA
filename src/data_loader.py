@@ -95,28 +95,3 @@ def load_results():
     except Exception as e:
         print(f"[Eroare la citirea rezultatelor]: {e}")
         return []
-# ===================== LEARN MODE: MATERIALE =====================
-def load_learning_materials():
-    """
-    Încarcă materialele de învățare pentru Learn Mode din data/docs/.
-    Returnează un dicționar cu domeniile și materialele aferente.
-    """
-    docs_dir = os.path.join(DATA_DIR, "docs")
-    materials = {}
-
-    if not os.path.exists(docs_dir):
-        print(f"[Avertisment] Folderul {docs_dir} nu există.")
-        return materials
-
-    try:
-        for file in os.listdir(docs_dir):
-            if file.endswith(".json"):
-                domain = file.replace(".json", "")
-                file_path = os.path.join(docs_dir, file)
-                with open(file_path, "r", encoding="utf-8") as f:
-                    materials[domain] = json.load(f)
-        print(f"[INFO] Încărcate materiale pentru {len(materials)} domenii din docs/.")
-    except Exception as e:
-        print(f"[Eroare la încărcarea materialelor]: {e}")
-
-    return materials
