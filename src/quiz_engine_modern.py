@@ -1,111 +1,100 @@
 import json
 import os
 import random
-from stats_manager import LeaderboardManager
-
-
-# ==========================================================
-#  🧠 QuizEngine — Original + integrare Leaderboard (FEA 6.0)
-# ==========================================================
+from datetime import datetime
+from stats_manager import LeaderboardManager  # 🏆 nou
 
 class QuizEngine:
-    def __init__(self, ui, questions, mode, domain):
-        """
-        Inițializează motorul de quiz.
-        ui: interfața principală (UI handler)
-        questions: lista de întrebări încărcate din JSON
-        mode: mod de rulare ("train" / "exam")
-        domain: categoria de întrebări (ex: "structural", "crash" etc.)
-        """
-        self.ui = ui
-        self.questions = questions
+    def __init__(self, data_path="data/questions.json"):
+        self.data_path = data_path
+        self.questions = []
+        self.current_index = 0
+        self.score = 0
+        self.mode = "train"
+        self.domain = "General"
+        self.username = "User"
+
+        self.load_questions()
+
+    # =============================================================
+    # 🧩 LOAD QUESTIONS
+    # =============================================================
+    def load_questions(self):
+        """Încarcă întrebările din fișierul JSON."""
+        if not os.path.exists(self.data_path):
+            print(f"[Eroare] Fișierul de întrebări nu există: {self.data_path}")
+            return
+
+        with open(self.data_path, "r", encoding="utf-8") as f:
+            try:
+                data = json.load(f)
+                self.questions = data.get("questions", [])
+            except json.JSONDecodeError:
+                print("[Eroare] Format JSON invalid în fișierul de întrebări.")
+
+    # =============================================================
+    # 🧠 QUIZ LOGIC
+    # =============================================================
+    def start_quiz(self, mode="train", domain="General", username="User"):
         self.mode = mode
         self.domain = domain
-        self.current_question = 0
+        self.username = username
         self.score = 0
-        self.total_questions = len(questions)
-        self.time_left = 0
-        self.timer_running = False
-        self.correct_answers = 0
-        self.wrong_answers = 0
-
-    # ----------------------------------------------------------
-    def start(self):
-        """Pornește quiz-ul de la prima întrebare."""
-        self.current_question = 0
-        self.score = 0
+        self.current_index = 0
         random.shuffle(self.questions)
-        self.show_question()
 
-    # ----------------------------------------------------------
-    def show_question(self):
-        """Afișează întrebarea curentă în UI."""
-        if self.current_question >= self.total_questions:
-            self.end_quiz()
-            return
-        question = self.questions[self.current_question]
-        self.ui.display_question(
-            question,
-            self.current_question + 1,
-            self.total_questions
-        )
+    def get_current_question(self):
+        """Returnează întrebarea curentă."""
+        if self.current_index < len(self.questions):
+            return self.questions[self.current_index]
+        return None
 
-    # ----------------------------------------------------------
-    def check_answer(self, selected):
-        """Verifică răspunsul selectat și actualizează scorul."""
-        question = self.questions[self.current_question]
-        correct = question["answer"]
+    def answer_question(self, user_answer):
+        """Verifică răspunsul utilizatorului și actualizează scorul."""
+        question = self.get_current_question()
+        if not question:
+            return False
 
-        if selected == correct:
+        correct = question.get("correct")
+        if user_answer == correct:
             self.score += 1
-            self.correct_answers += 1
-            self.ui.display_feedback(True, question)
+            result = True
         else:
-            self.wrong_answers += 1
-            self.ui.display_feedback(False, question)
+            result = False
 
-    # ----------------------------------------------------------
-    def next_question(self):
-        """Trece la următoarea întrebare."""
-        self.current_question += 1
-        if self.current_question < self.total_questions:
-            self.show_question()
-        else:
-            self.end_quiz()
+        self.current_index += 1
+        return result
 
-    # ----------------------------------------------------------
-    def end_quiz(self):
-        """Finalizează quiz-ul și afișează rezultatele."""
-        if self.total_questions == 0:
-            percentage = 0
-        else:
-            percentage = (self.score / self.total_questions) * 100
+    def has_next_question(self):
+        """Verifică dacă mai sunt întrebări disponibile."""
+        return self.current_index < len(self.questions)
 
-        # Trimite scorul către UI pentru afișare finală
-        self.ui.display_final_result(percentage)
+    def get_progress(self):
+        """Returnează progresul curent (curent / total)."""
+        total = len(self.questions)
+        return self.current_index, total
 
-        # ----------------------------------------------------------
-        # 🏆 NOU: Salvare automată scor în Leaderboard Local
-        # ----------------------------------------------------------
-        try:
-            # Citim numele utilizatorului din settings.json (dacă există)
-            settings_path = os.path.join("data", "settings.json")
-            user_name = "Anonim"
-            if os.path.exists(settings_path):
-                with open(settings_path, "r", encoding="utf-8") as f:
-                    settings = json.load(f)
-                    user_name = settings.get("user_name", "Anonim")
+    # =============================================================
+    # 🏁 RESULTS
+    # =============================================================
+    def get_results(self):
+        """Returnează rezultatele finale."""
+        total = len(self.questions)
+        score_percent = round((self.score / total) * 100, 2) if total > 0 else 0
+        return {
+            "name": self.username,
+            "domain": self.domain,
+            "mode": self.mode,
+            "score": score_percent,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M")
+        }
 
-            # Inițializăm și salvăm scorul în leaderboard
-            leaderboard = LeaderboardManager()
-            leaderboard.add_score(
-                name=user_name,
-                mode=self.mode,
-                domain=self.domain,
-                score=percentage
-            )
-
-        except Exception as e:
-            print(f"[WARN] Eroare la salvarea scorului în Leaderboard: {e}")
-
-        # Poate fi extins ulterior pentru leaderboard global
+    # =============================================================
+    # 🏆 SAVE TO LEADERBOARD
+    # =============================================================
+    def save_to_leaderboard(self):
+        """Salvează rezultatul final în leaderboard.json."""
+        result = self.get_results()
+        leaderboard = LeaderboardManager()
+        leaderboard.add_score(result)
+        print(f"[INFO] Scorul a fost salvat în leaderboard: {result}")
