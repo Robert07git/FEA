@@ -3,21 +3,26 @@ import os
 import random
 
 # ================================================================
-#  DATA LOADER - Moment 2 (versiune completă cu Leaderboard Local)
+#  DATA LOADER - Moment 2.1 (versiune completă cu Leaderboard Local)
 # ================================================================
+
+# === 0. DETECTARE AUTOMATĂ A FOLDERULUI DATA ===
+def get_data_dir():
+    """Determină calea absolută către folderul 'data' indiferent de unde rulezi aplicația."""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    # Dacă rulezi din src/, mergem un nivel mai sus
+    data_dir = os.path.join(base_dir, "..", "data")
+    os.makedirs(data_dir, exist_ok=True)
+    return data_dir
+
 
 # === 1. ÎNCĂRCARE ÎNTREBĂRI QUIZ ===
 def load_questions():
-    """
-    Încarcă întrebările din fișierul fea_questions.json
-    Returnează o listă de dicționare.
-    """
-    path = os.path.join("data", "fea_questions.json")
+    path = os.path.join(get_data_dir(), "fea_questions.json")
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
             if isinstance(data, dict):
-                # uneori fișierul poate conține un singur domeniu, transformăm în listă
                 questions = []
                 for domain, qlist in data.items():
                     for q in qlist:
@@ -32,9 +37,6 @@ def load_questions():
 
 # === 2. SELECTARE ALEATORIE DE ÎNTREBĂRI ===
 def get_random_questions(domain="mix", count=10):
-    """
-    Returnează un set de întrebări aleatorii din domeniul ales.
-    """
     all_questions = load_questions()
     if not all_questions:
         return []
@@ -48,9 +50,9 @@ def get_random_questions(domain="mix", count=10):
     return filtered[:count]
 
 
-# === 3. GESTIONARE STATISTICI (Moment 1 - neschimbat) ===
+# === 3. GESTIONARE STATISTICI ===
 def load_stats():
-    path = os.path.join("data", "results.json")
+    path = os.path.join(get_data_dir(), "results.json")
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -59,42 +61,34 @@ def load_stats():
 
 
 def save_stats(data):
-    path = os.path.join("data", "results.json")
+    path = os.path.join(get_data_dir(), "results.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 
 def add_session(result):
-    """
-    Adaugă o nouă sesiune în istoricul general (train/exam).
-    """
     stats = load_stats()
     stats.append(result)
     save_stats(stats)
 
 
-# === 4. LEADERBOARD LOCAL (Moment 2 nou) ===
+# === 4. LEADERBOARD LOCAL ===
 def load_leaderboard():
     """
     Încarcă leaderboard-ul local.
     Creează automat fișierul dacă lipsește sau este invalid.
     """
-    path = os.path.join("data", "leaderboard.json")
+    path = os.path.join(get_data_dir(), "leaderboard.json")
 
-    # Dacă nu există folderul data, îl creăm
-    os.makedirs("data", exist_ok=True)
-
-    # Dacă fișierul nu există, îl creăm cu o listă goală
     if not os.path.exists(path):
         with open(path, "w", encoding="utf-8") as f:
             json.dump([], f, indent=4)
         return []
 
-    # Citire sigură
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
-            if isinstance(data, dict):  # dacă e dict în loc de listă, resetăm
+            if isinstance(data, dict):
                 data = []
     except json.JSONDecodeError:
         data = []
@@ -105,13 +99,16 @@ def load_leaderboard():
 def save_leaderboard(data):
     """
     Salvează leaderboard-ul local în fișierul JSON.
-    Se asigură că fișierul este o listă validă.
+    Detectează automat calea corectă și repară fișierul dacă e invalid.
     """
-    path = os.path.join("data", "leaderboard.json")
-    os.makedirs("data", exist_ok=True)
+    path = os.path.join(get_data_dir(), "leaderboard.json")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
 
     if not isinstance(data, list):
         data = []
+
+    # Debug opțional — vezi unde scrie
+    print(f"[DEBUG] Leaderboard salvat în: {os.path.abspath(path)}")
 
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
